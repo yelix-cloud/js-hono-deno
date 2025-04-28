@@ -1,8 +1,14 @@
 // deno-lint-ignore-file no-explicit-any
-import { Context, ExecutionContext, Hono, MiddlewareHandler, Next } from 'hono';
+import {
+  type Context,
+  type ExecutionContext,
+  Hono,
+  type MiddlewareHandler,
+  type Next,
+} from 'hono';
 import process from 'node:process';
-import { HonoOptions } from 'hono/hono-base';
-import { BlankEnv } from 'hono/types';
+import type { HonoOptions } from 'hono/hono-base';
+import type { BlankEnv } from 'hono/types';
 
 type HonoBasedHandlers =
   | ((c: Context, next: Next) => Promise<Response>)
@@ -16,10 +22,12 @@ type handlers = Array<
 
 type MountOptionHandler = (c: Context) => unknown;
 type MountReplaceRequest = (originalRequest: Request) => Request;
-type MountOptions = MountOptionHandler | {
-    optionHandler?: MountOptionHandler;
-    replaceRequest?: MountReplaceRequest | false;
-};
+type MountOptions =
+  | MountOptionHandler
+  | {
+      optionHandler?: MountOptionHandler;
+      replaceRequest?: MountReplaceRequest | false;
+    };
 
 /**
  * Represents a middleware handler with additional metadata.
@@ -334,7 +342,12 @@ class YelixHono {
     Env?: any,
     executionCtx?: ExecutionContext
   ): Response | Promise<Response> {
-    return this.hono.request(input, requestInit as undefined, Env, executionCtx);
+    return this.hono.request(
+      input,
+      requestInit as undefined,
+      Env,
+      executionCtx
+    );
   }
 
   /**
@@ -365,7 +378,10 @@ class YelixHono {
    */
   mount(
     path: string,
-    applicationHandler: (request: Request, ...args: any) => Response | Promise<Response>,
+    applicationHandler: (
+      request: Request,
+      ...args: any
+    ) => Response | Promise<Response>,
     options?: MountOptions
   ): this {
     this.hono.mount(path, applicationHandler, options);
@@ -378,7 +394,7 @@ class YelixHono {
   get routes(): Hono['routes'] {
     return this.hono.routes;
   }
-  
+
   /**
    * Retrieves the router instance used by the application.
    */
