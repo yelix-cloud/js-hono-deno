@@ -21,11 +21,19 @@ type MountOptions = MountOptionHandler | {
     replaceRequest?: MountReplaceRequest | false;
 };
 
+/**
+ * Represents a middleware handler with additional metadata.
+ */
 class YelixHonoMiddleware {
   handler: HonoBasedHandlers;
   name: string;
   metadata: Record<string, any>;
 
+  /**
+   * @param name - The name of the middleware.
+   * @param handler - The middleware handler function.
+   * @param metadata - Additional metadata for the middleware.
+   */
   constructor(
     name: string,
     handler: HonoBasedHandlers,
@@ -37,12 +45,20 @@ class YelixHonoMiddleware {
   }
 }
 
+/**
+ * A wrapper around the Hono framework with additional features like middleware parsing,
+ * enhanced logging, and route handling.
+ */
 class YelixHono {
   hono: Hono;
 
+  /**
+   * @param options - Optional configuration for the Hono instance.
+   */
   constructor(options?: HonoOptions<BlankEnv>) {
     this.hono = new Hono(options);
 
+    // Middleware to initialize a counter for middleware execution.
     this.hono.use('*', async (c, next) => {
       if (!c.get('X-Yelix-Middleware-Counter' as never)) {
         c.set('X-Yelix-Middleware-Counter' as never, '0');
@@ -51,6 +67,12 @@ class YelixHono {
     });
   }
 
+  /**
+   * Calculates the time difference between two high-resolution timestamps.
+   * @param st - Start time as a tuple of seconds and nanoseconds.
+   * @param et - End time as a tuple of seconds and nanoseconds.
+   * @returns A formatted string representing the time difference.
+   */
   private calculateDifference(
     st: [number, number],
     et: [number, number]
@@ -82,6 +104,12 @@ class YelixHono {
     }
   }
 
+  /**
+   * Wraps a middleware handler with additional functionality like logging and execution time measurement.
+   * @param name - The name of the middleware.
+   * @param handler - The middleware handler function.
+   * @returns A wrapped middleware function.
+   */
   private ensureMiddleware(name: string | null, handler: HonoBasedHandlers) {
     return async (c: Context, next: Next) => {
       let count = c.get('X-Yelix-Middleware-Counter') ?? '';
@@ -105,6 +133,12 @@ class YelixHono {
     };
   }
 
+  /**
+   * Parses and wraps an array of middleware handlers.
+   * @param Middlewares - The array of middleware handlers.
+   * @param updateNameForHandler - Whether to update the name of the last middleware.
+   * @returns An array of wrapped middleware functions.
+   */
   private parseMiddlewares(Middlewares: handlers, updateNameForHandler = true) {
     if (Middlewares.length < 1) return [];
 
@@ -132,54 +166,109 @@ class YelixHono {
     });
   }
 
+  /**
+   * Registers a POST route with the specified path and handlers.
+   * @param path - The route path.
+   * @param handlers - The middleware handlers for the route.
+   * @returns The current instance for chaining.
+   */
   post(path: string, ...handlers: handlers): this {
     const middlewareHandlers = this.parseMiddlewares(handlers);
     this.hono.post(path, ...middlewareHandlers);
     return this;
   }
 
+  /**
+   * Registers a GET route with the specified path and handlers.
+   * @param path - The route path.
+   * @param handlers - The middleware handlers for the route.
+   * @returns The current instance for chaining.
+   */
   get(path: string, ...handlers: handlers): this {
     const middlewareHandlers = this.parseMiddlewares(handlers);
     this.hono.get(path, ...middlewareHandlers);
     return this;
   }
 
+  /**
+   * Registers a DELETE route with the specified path and handlers.
+   * @param path - The route path.
+   * @param handlers - The middleware handlers for the route.
+   * @returns The current instance for chaining.
+   */
   delete(path: string, ...handlers: handlers): this {
     const middlewareHandlers = this.parseMiddlewares(handlers);
     this.hono.delete(path, ...middlewareHandlers);
     return this;
   }
 
+  /**
+   * Registers a PUT route with the specified path and handlers.
+   * @param path - The route path.
+   * @param handlers - The middleware handlers for the route.
+   * @returns The current instance for chaining.
+   */
   put(path: string, ...handlers: handlers): this {
     const middlewareHandlers = this.parseMiddlewares(handlers);
     this.hono.put(path, ...middlewareHandlers);
     return this;
   }
 
+  /**
+   * Registers a PATCH route with the specified path and handlers.
+   * @param path - The route path.
+   * @param handlers - The middleware handlers for the route.
+   * @returns The current instance for chaining.
+   */
   patch(path: string, ...handlers: handlers): this {
     const middlewareHandlers = this.parseMiddlewares(handlers);
     this.hono.patch(path, ...middlewareHandlers);
     return this;
   }
 
+  /**
+   * Registers an OPTIONS route with the specified path and handlers.
+   * @param path - The route path.
+   * @param handlers - The middleware handlers for the route.
+   * @returns The current instance for chaining.
+   */
   options(path: string, ...handlers: handlers): this {
     const middlewareHandlers = this.parseMiddlewares(handlers);
     this.hono.options(path, ...middlewareHandlers);
     return this;
   }
 
+  /**
+   * Registers a route that matches all HTTP methods with the specified path and handlers.
+   * @param path - The route path.
+   * @param handlers - The middleware handlers for the route.
+   * @returns The current instance for chaining.
+   */
   all(path: string, ...handlers: handlers): this {
     const middlewareHandlers = this.parseMiddlewares(handlers);
     this.hono.all(path, ...middlewareHandlers);
     return this;
   }
 
+  /**
+   * Registers a route with a specific HTTP method and path.
+   * @param method - The HTTP method.
+   * @param path - The route path.
+   * @param handlers - The middleware handlers for the route.
+   * @returns The current instance for chaining.
+   */
   on(method: string, path: string, ...handlers: handlers): this {
     const middlewareHandlers = this.parseMiddlewares(handlers);
     this.hono.on(method, path, ...middlewareHandlers);
     return this;
   }
 
+  /**
+   * Registers middleware for a specific path or globally.
+   * @param pathOrHandler - The path or the first middleware handler.
+   * @param handlers - Additional middleware handlers.
+   * @returns The current instance for chaining.
+   */
   use(pathOrHandler: string | handlers[0], ...handlers: handlers): this {
     const middlewareHandlers =
       typeof pathOrHandler === 'string'
@@ -194,6 +283,12 @@ class YelixHono {
     return this;
   }
 
+  /**
+   * Mounts another Hono or YelixHono instance at the specified path.
+   * @param path - The base path for the mounted instance.
+   * @param instance - The instance to mount.
+   * @returns The current instance for chaining.
+   */
   route(path: string, instance: YelixHono | Hono): this {
     if (instance instanceof YelixHono) {
       this.hono.route(path, instance.hono);
@@ -203,6 +298,11 @@ class YelixHono {
     return this;
   }
 
+  /**
+   * Sets a custom error handler for the application.
+   * @param handler - The error handler function.
+   * @returns The current instance for chaining.
+   */
   onError(
     handler: (err: Error, c: Context) => Response | Promise<Response>
   ): this {
@@ -210,11 +310,24 @@ class YelixHono {
     return this;
   }
 
+  /**
+   * Sets a custom handler for 404 Not Found responses.
+   * @param handler - The handler function for 404 responses.
+   * @returns The current instance for chaining.
+   */
   notFound(handler: (c: Context) => Response | Promise<Response>): this {
     this.hono.notFound(handler);
     return this;
   }
 
+  /**
+   * Sends a request to the application and returns the response.
+   * @param input - The request input (URL or Request object).
+   * @param requestInit - Optional request initialization options.
+   * @param Env - Optional environment bindings.
+   * @param executionCtx - Optional execution context.
+   * @returns The response from the application.
+   */
   request(
     input: RequestInfo | URL,
     requestInit?: RequestInit,
@@ -224,29 +337,60 @@ class YelixHono {
     return this.hono.request(input, requestInit as undefined, Env, executionCtx);
   }
 
+  /**
+   * Starts the application by listening for incoming requests.
+   * @returns The current instance for chaining.
+   */
   fire(): this {
     this.hono.fire();
     return this;
   }
 
+  /**
+   * Sets a base path for all routes in the application.
+   * @param path - The base path.
+   * @returns The current instance for chaining.
+   */
   basePath(path: string): this {
     this.hono.basePath(path);
     return this;
   }
 
-  mount(path: string, applicationHandler: (request: Request, ...args: any) => Response | Promise<Response>, options?: MountOptions): this {
+  /**
+   * Mounts an external application handler at the specified path.
+   * @param path - The base path for the mounted handler.
+   * @param applicationHandler - The external application handler function.
+   * @param options - Optional mount options.
+   * @returns The current instance for chaining.
+   */
+  mount(
+    path: string,
+    applicationHandler: (request: Request, ...args: any) => Response | Promise<Response>,
+    options?: MountOptions
+  ): this {
     this.hono.mount(path, applicationHandler, options);
     return this;
   }
 
+  /**
+   * Retrieves the routes defined in the application.
+   */
   get routes(): Hono['routes'] {
     return this.hono.routes;
   }
   
+  /**
+   * Retrieves the router instance used by the application.
+   */
   get router(): Hono['router'] {
     return this.hono.router;
   }
 
+  /**
+   * Handles incoming requests and returns the response.
+   * @param req - The incoming request.
+   * @returns The response from the application.
+   */
   fetch = async (req: Request): Promise<Response> => {
     const start = process.hrtime();
     const url = new URL(req.url);
