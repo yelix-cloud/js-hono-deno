@@ -15,7 +15,8 @@ Hono Abstractor is a lightweight abstraction layer built on top of the [Hono](ht
 
 ```ts
 import { z } from 'zod';
-import { YelixHono, zValidatorYelix } from 'jsr:@yelix/hono';
+import { YelixHono } from 'jsr:@yelix/hono';
+import { zValidatorYelix } from 'jsr:@yelix/zod-validator';
 
 const app = new YelixHono();
 
