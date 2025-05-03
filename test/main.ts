@@ -1,6 +1,6 @@
 // deno-lint-ignore-file require-await
 import { z } from "zod";
-import { YelixHono } from "../Hono.ts";
+import { YelixHono } from "../src/Hono.ts";
 import { zValidatorYelix } from "@yelix/zod-validator";
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";

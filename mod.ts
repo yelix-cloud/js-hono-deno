@@ -1,1 +1,1 @@
-export * from "./Hono.ts";
+export * from "./src/Hono.ts";

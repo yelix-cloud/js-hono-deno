@@ -3,110 +3,18 @@ import {
   type Context,
   type ExecutionContext,
   Hono,
-  type MiddlewareHandler,
   type Next,
-} from "hono";
-import process from "node:process";
-import type { HonoOptions } from "hono/hono-base";
-import type { BlankEnv } from "hono/types";
-
-type HonoBasedHandlers =
-  | ((c: Context, next: Next) => Response | Promise<Response>)
-  | MiddlewareHandler;
-
-type handlers = Array<
-  | ((c: Context, next: Next) => Response | Promise<Response>)
-  | MiddlewareHandler
-  | YelixHonoMiddleware
->;
-
-type MountOptionHandler = (c: Context) => unknown;
-type MountReplaceRequest = (originalRequest: Request) => Request;
-type MountOptions =
-  | MountOptionHandler
-  | {
-    optionHandler?: MountOptionHandler;
-    replaceRequest?: MountReplaceRequest | false;
-  };
-
-/**
- * Represents a middleware handler with additional metadata.
- */
-class YelixHonoMiddleware {
-  handler: HonoBasedHandlers;
-  name: string;
-  metadata: Record<string, any>;
-
-  /**
-   * @param name - The name of the middleware.
-   * @param handler - The middleware handler function.
-   * @param metadata - Additional metadata for the middleware.
-   */
-  constructor(
-    name: string,
-    handler: HonoBasedHandlers,
-    metadata: Record<string, any> = {},
-  ) {
-    this.handler = handler;
-    this.name = name;
-    this.metadata = metadata;
-  }
-}
-
-type RequestBody =
-  | string
-  | object
-  | ArrayBuffer
-  | ArrayBufferView
-  | FormData
-  | URLSearchParams
-  | ReadableStream<Uint8Array>
-  | Blob;
-
-async function parseAndCloneBody(req: Request) {
-  const contentType = req.headers.get("content-type") || "";
-  const clone = req.clone();
-
-  let type: "json" | "formData" | "text" | "arrayBuffer" | "blob" | "none" =
-    "none";
-  let parsed: RequestBody | undefined;
-
-  if (contentType.includes("application/json")) {
-    const json = await clone.json();
-    type = "json";
-    parsed = json;
-  } else if (
-    contentType.includes("multipart/form-data") ||
-    contentType.includes("application/x-www-form-urlencoded")
-  ) {
-    const formData = await clone.formData();
-    type = "formData";
-    parsed = formData;
-  } else if (contentType.includes("text/plain")) {
-    const text = await clone.text();
-    type = "text";
-    parsed = text;
-  } else if (contentType.includes("application/octet-stream")) {
-    const buffer = await clone.arrayBuffer();
-    type = "arrayBuffer";
-    parsed = buffer;
-  } else if (contentType.includes("application/blob")) {
-    const blob = await clone.blob();
-    type = "blob";
-    parsed = blob;
-  }
-
-  function injectTo(honoReq: any) {
-    // deno-lint-ignore require-await
-    honoReq[type] = async () => parsed;
-  }
-
-  return {
-    type,
-    parsed,
-    injectTo,
-  };
-}
+} from 'hono';
+import process from 'node:process';
+import type { HonoOptions } from 'hono/hono-base';
+import type { BlankEnv } from 'hono/types';
+import type { RequestBody, HonoBasedHandlers, handlers, MountOptions } from "./types.ts";
+import {
+  createEndpointBuilder,
+  createEndpointPath,
+  OpenAPI,
+} from "@murat/openapi";
+import { YelixHonoMiddleware } from "./HonoMiddleware.ts";
 
 /**
  * A wrapper around the Hono framework with additional features like middleware parsing,
@@ -114,37 +22,94 @@ async function parseAndCloneBody(req: Request) {
  */
 class YelixHono {
   hono: Hono;
+  openapi: OpenAPI;
 
   /**
    * @param options - Optional configuration for the Hono instance.
    */
   constructor(options?: HonoOptions<BlankEnv>) {
     this.hono = new Hono(options);
+    this.openapi = new OpenAPI()
+      .setTitle('Yelix API')
+      .setDescription('Yelix API Documentation')
+      .setVersion('1.0.0');
 
     // Middleware to initialize a counter for middleware execution.
-    this.hono.use("*", async (c, next) => {
-      const requestBody = await parseAndCloneBody(c.req.raw);
-      requestBody.injectTo(c.req);
+    this.hono.use('*', async (c, next) => {
+      if (!c.get('YELIX_LOGGED' as never)) {
+        c.set('YELIX_LOGGED' as never, true);
+        const requestBody = await this.parseAndCloneBody(c.req.raw);
+        requestBody.injectTo(c.req);
 
-      const start = process.hrtime();
-      const url = new URL(c.req.url);
+        const start = process.hrtime();
+        const url = new URL(c.req.url);
 
-      console.group("RS |", url.pathname, c.req.method);
+        console.group('RS |', url.pathname, c.req.method);
 
-      if (!c.get("X-Yelix-Middleware-Counter" as never)) {
-        c.set("X-Yelix-Middleware-Counter" as never, "0");
+        if (!c.get('X-Yelix-Middleware-Counter' as never)) {
+          c.set('X-Yelix-Middleware-Counter' as never, '0');
+        }
+        await next();
+
+        console.groupEnd();
+
+        const end = process.hrtime();
+        const difference = this.calculateDifference(start, end);
+
+        console.log(
+          `RE | ${url.pathname}, method: ${c.req.method}, duration: ${difference}`
+        );
+      } else {
+        if (next) {
+          await next();
+        }
       }
-      await next();
-
-      console.groupEnd();
-
-      const end = process.hrtime();
-      const difference = this.calculateDifference(start, end);
-
-      console.log(
-        `RE | ${url.pathname}, method: ${c.req.method}, duration: ${difference}`,
-      );
     });
+  }
+
+  private async parseAndCloneBody(req: Request) {
+    const contentType = req.headers.get('content-type') || '';
+    const clone = req.clone();
+
+    let type: 'json' | 'formData' | 'text' | 'arrayBuffer' | 'blob' | 'none' =
+      'none';
+    let parsed: RequestBody | undefined;
+
+    if (contentType.includes('application/json')) {
+      const json = await clone.json();
+      type = 'json';
+      parsed = json;
+    } else if (
+      contentType.includes('multipart/form-data') ||
+      contentType.includes('application/x-www-form-urlencoded')
+    ) {
+      const formData = await clone.formData();
+      type = 'formData';
+      parsed = formData;
+    } else if (contentType.includes('text/plain')) {
+      const text = await clone.text();
+      type = 'text';
+      parsed = text;
+    } else if (contentType.includes('application/octet-stream')) {
+      const buffer = await clone.arrayBuffer();
+      type = 'arrayBuffer';
+      parsed = buffer;
+    } else if (contentType.includes('application/blob')) {
+      const blob = await clone.blob();
+      type = 'blob';
+      parsed = blob;
+    }
+
+    function injectTo(honoReq: any) {
+      // deno-lint-ignore require-await
+      honoReq[type] = async () => parsed;
+    }
+
+    return {
+      type,
+      parsed,
+      injectTo,
+    };
   }
 
   /**
@@ -155,7 +120,7 @@ class YelixHono {
    */
   private calculateDifference(
     st: [number, number],
-    et: [number, number],
+    et: [number, number]
   ): string {
     const diffInNanoSeconds = (et[0] - st[0]) * 1e9 + (et[1] - st[1]); // Difference in nanoseconds
 
@@ -174,7 +139,7 @@ class YelixHono {
       // 1s to 10s -> <seconds>.<ms>s
       const seconds = Math.floor(diffInNanoSeconds / 1000000000);
       const milliseconds = Math.floor(
-        (diffInNanoSeconds % 1000000000) / 1000000,
+        (diffInNanoSeconds % 1000000000) / 1000000
       );
       return `${seconds}.${milliseconds}s`;
     } else {
@@ -192,17 +157,17 @@ class YelixHono {
    */
   private ensureMiddleware(name: string | null, handler: HonoBasedHandlers) {
     return async (c: Context, next: Next) => {
-      let count = c.get("X-Yelix-Middleware-Counter") ?? "";
-      if (count === "" || isNaN(Number(count))) {
-        count = "0";
+      let count = c.get('X-Yelix-Middleware-Counter') ?? '';
+      if (count === '' || isNaN(Number(count))) {
+        count = '0';
       }
-      c.set("X-Yelix-Middleware-Counter", String(Number(count) + 1));
+      c.set('X-Yelix-Middleware-Counter', String(Number(count) + 1));
       if (!name) {
         name = `Anonymous_${count}`;
       }
 
       const start = process.hrtime();
-      console.group("MS |", name);
+      console.group('MS |', name);
       const response = await handler(c, next);
       const end = process.hrtime();
       console.groupEnd();
@@ -226,11 +191,11 @@ class YelixHono {
     if (updateNameForHandler) {
       const lastMiddleware = Middlewares[Middlewares.length - 1];
       const nameAssigned = new YelixHonoMiddleware(
-        "handler",
+        'handler',
         lastMiddleware as HonoBasedHandlers,
         {
-          _yelixKeys: ["handler"],
-        },
+          _yelixKeys: ['handler'],
+        }
       );
       Middlewares[Middlewares.length - 1] = nameAssigned;
     }
@@ -238,9 +203,19 @@ class YelixHono {
     return Middlewares.map((handler) => {
       if (handler instanceof YelixHonoMiddleware) {
         return this.ensureMiddleware(handler.name, handler.handler);
-      } else if (typeof handler === "function") {
-        const name = null;
-        return this.ensureMiddleware(name, handler);
+      } else if (typeof handler === 'function') {
+        return this.ensureMiddleware(null, handler);
+      } else if (
+        // Unsafe handler for edge cases
+        handler &&
+        typeof handler === 'object' &&
+        'handler' in handler &&
+        typeof (handler as any).handler === 'function'
+      ) {
+        return this.ensureMiddleware(
+          (handler as any).name || null,
+          (handler as any).handler
+        );
       }
       return handler;
     });
@@ -265,7 +240,7 @@ class YelixHono {
    * @returns The current instance for chaining.
    */
   get(path: string, ...handlers: handlers): this {
-    const middlewareHandlers = this.parseMiddlewares(handlers);
+    const middlewareHandlers = this.parseMiddlewares(handlers, true);
     this.hono.get(path, ...middlewareHandlers);
     return this;
   }
@@ -350,11 +325,12 @@ class YelixHono {
    * @returns The current instance for chaining.
    */
   use(pathOrHandler: string | handlers[0], ...handlers: handlers): this {
-    const middlewareHandlers = typeof pathOrHandler === "string"
-      ? this.parseMiddlewares(handlers, false)
-      : this.parseMiddlewares([pathOrHandler, ...handlers], false);
+    const middlewareHandlers =
+      typeof pathOrHandler === 'string'
+        ? this.parseMiddlewares(handlers, false)
+        : this.parseMiddlewares([pathOrHandler, ...handlers], false);
 
-    if (typeof pathOrHandler === "string") {
+    if (typeof pathOrHandler === 'string') {
       this.hono.use(pathOrHandler, ...middlewareHandlers);
     } else {
       this.hono.use(...middlewareHandlers);
@@ -383,7 +359,7 @@ class YelixHono {
    * @returns The current instance for chaining.
    */
   onError(
-    handler: (err: Error, c: Context) => Response | Promise<Response>,
+    handler: (err: Error, c: Context) => Response | Promise<Response>
   ): this {
     this.hono.onError(handler);
     return this;
@@ -411,13 +387,13 @@ class YelixHono {
     input: RequestInfo | URL,
     requestInit?: RequestInit,
     Env?: any,
-    executionCtx?: ExecutionContext,
+    executionCtx?: ExecutionContext
   ): Response | Promise<Response> {
     return this.hono.request(
       input,
       requestInit as undefined,
       Env,
-      executionCtx,
+      executionCtx
     );
   }
 
@@ -453,7 +429,7 @@ class YelixHono {
       request: Request,
       ...args: any
     ) => Response | Promise<Response>,
-    options?: MountOptions,
+    options?: MountOptions
   ): this {
     this.hono.mount(path, applicationHandler, options);
     return this;
@@ -462,14 +438,14 @@ class YelixHono {
   /**
    * Retrieves the routes defined in the application.
    */
-  get routes(): Hono["routes"] {
+  get routes(): Hono['routes'] {
     return this.hono.routes;
   }
 
   /**
    * Retrieves the router instance used by the application.
    */
-  get router(): Hono["router"] {
+  get router(): Hono['router'] {
     return this.hono.router;
   }
 
