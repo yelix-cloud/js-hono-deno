@@ -2,6 +2,8 @@
 import { z } from 'zod';
 import { YelixHono } from '../Hono.ts';
 import { zValidatorYelix } from '@yelix/zod-validator';
+import { Hono } from "hono";
+import { zValidator } from "@hono/zod-validator";
 
 type Task = {
   id: number;

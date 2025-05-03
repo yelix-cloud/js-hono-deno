@@ -9,13 +9,14 @@ import {
 import process from 'node:process';
 import type { HonoOptions } from 'hono/hono-base';
 import type { BlankEnv } from 'hono/types';
+import { YelixSDK } from '@yelix/sdk';
 
 type HonoBasedHandlers =
-  | ((c: Context, next: Next) => (Response | Promise<Response>))
+  | ((c: Context, next: Next) => Promise<Response>)
   | MiddlewareHandler;
 
 type handlers = Array<
-  | ((c: Context, next: Next) => (Response | Promise<Response>))
+  | ((c: Context, next: Next) => Promise<Response>)
   | MiddlewareHandler
   | YelixHonoMiddleware
 >;
@@ -123,8 +124,20 @@ class YelixHono {
 
     // Middleware to initialize a counter for middleware execution.
     this.hono.use('*', async (c, next) => {
+      const [requestTrace, requestId] = YelixSDK.startRequest()
+        .setMethod(c.req.method)
+        .setUrl(c.req.url)
+        .setHeaders(c.req.header())
+        .setQuery(c.req.query());
+
       const requestBody = await parseAndCloneBody(c.req.raw);
       requestBody.injectTo(c.req);
+      requestTrace
+        .setBody(requestBody.parsed as any)
+        .setBodyType(requestBody.type as any);
+
+      c.set('X-Yelix-Request-ID' as never, requestId as string);
+      c.set('X-Yelix-Request-Trace' as never, requestTrace as any);
 
       const start = process.hrtime();
       const url = new URL(c.req.url);
@@ -135,6 +148,8 @@ class YelixHono {
         c.set('X-Yelix-Middleware-Counter' as never, '0');
       }
       await next();
+
+      requestTrace.end();
 
       console.groupEnd();
 
