@@ -37,7 +37,7 @@ class YelixHono {
       title: 'Yelix Hono API',
       description: 'Yelix Hono API Documentation',
       version: '1.0.0',
-    }
+    };
 
     // Middleware to initialize a counter for middleware execution.
     this.hono.use('*', async (c, next) => {
@@ -242,13 +242,14 @@ class YelixHono {
   ): YelixHonoMiddleware | undefined {
     return handlers
       .filter((handler) => handler instanceof YelixHonoMiddleware)
-      .find((x) => x?.metadata?._yelixKeys?.includes(key)) as YelixHonoMiddleware;
+      .find((x) =>
+        x?.metadata?._yelixKeys?.includes(key)
+      ) as YelixHonoMiddleware;
   }
 
   private convertColonRoutesToBraces(path: string): string {
     return path.replace(/:([^/]+)/g, (_, param) => `{${param}}`);
   }
-  
 
   private loadEndpointDocs(
     path: string,
@@ -260,7 +261,9 @@ class YelixHono {
 
     if (endpointDocs?.hide) return;
 
-    const openapiFriendlyPath = this.convertColonRoutesToBraces(endpointDocs?.path || path);
+    const openapiFriendlyPath = this.convertColonRoutesToBraces(
+      endpointDocs?.path || path
+    );
 
     const endpointPath = createEndpointBuilder()
       .setMethod(endpointDocs?.method || method)
@@ -285,7 +288,6 @@ class YelixHono {
     this.hono.post(path, ...middlewareHandlers);
     return this;
   }
-
 
   /**
    * Registers a GET route with the specified path and handlers.
@@ -417,13 +419,12 @@ class YelixHono {
   route(path: string, instance: YelixHono | Hono): this {
     if (instance instanceof YelixHono) {
       this.hono.route(path, instance.hono);
-      
+
       // Merge the endpoints from the mounted instance
       const endpoints = instance.__endpoints;
       for (const endpoint of endpoints) {
         const ePath = endpoint.path;
         const merged = this.mergePaths(path, ePath);
-        console.log(`-${path}- and -${ePath}- merged to -${merged}-`);
         const openapiFriendlyPath = this.convertColonRoutesToBraces(merged);
         endpoint.setPath(openapiFriendlyPath);
       }
@@ -436,17 +437,13 @@ class YelixHono {
   }
 
   private mergePaths(...parts: string[]): string {
-    const merged = parts
-      .map(p => p.trim())                 // remove extra spaces
-      .filter(p => p.length > 0)          // remove empty strings
-      .map((p, i) =>
-        i === 0 ? p.replace(/\/+$/, '')   // first part: remove trailing slashes
-               : p.replace(/^\/+/, '')    // other parts: remove leading slashes
-      )
-      .join('/');
-  
-    return '/' + merged; // always prefix with a single leading slash
-  }  
+    const segments = parts
+      .flatMap((p) => p.split('/')) // split all parts by slash
+      .filter((p) => p && p.trim()) // remove empty segments
+      .map((p) => p.trim());
+
+    return '/' + segments.join('/');
+  }
 
   /**
    * Sets a custom error handler for the application.
