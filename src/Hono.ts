@@ -1,20 +1,22 @@
 // deno-lint-ignore-file no-explicit-any
-import {
-  type Context,
-  type ExecutionContext,
-  Hono,
-  type Next,
-} from 'hono';
+import { type Context, type ExecutionContext, Hono, type Next } from 'hono';
 import process from 'node:process';
 import type { HonoOptions } from 'hono/hono-base';
 import type { BlankEnv } from 'hono/types';
-import type { RequestBody, HonoBasedHandlers, handlers, MountOptions } from "./types.ts";
+import type {
+  RequestBody,
+  HonoBasedHandlers,
+  handlers,
+  MountOptions,
+  EndpointDocs,
+  OpenAPIInformation,
+} from './types.ts';
 import {
   createEndpointBuilder,
-  createEndpointPath,
   OpenAPI,
-} from "@murat/openapi";
-import { YelixHonoMiddleware } from "./HonoMiddleware.ts";
+  type EndpointBuilder,
+} from '@murat/openapi';
+import { YelixHonoMiddleware } from './HonoMiddleware.ts';
 
 /**
  * A wrapper around the Hono framework with additional features like middleware parsing,
@@ -22,17 +24,19 @@ import { YelixHonoMiddleware } from "./HonoMiddleware.ts";
  */
 class YelixHono {
   hono: Hono;
-  openapi: OpenAPI;
+  __openapi: OpenAPIInformation;
+  __endpoints: EndpointBuilder[] = [];
 
   /**
    * @param options - Optional configuration for the Hono instance.
    */
   constructor(options?: HonoOptions<BlankEnv>) {
     this.hono = new Hono(options);
-    this.openapi = new OpenAPI()
-      .setTitle('Yelix API')
-      .setDescription('Yelix API Documentation')
-      .setVersion('1.0.0');
+    this.__openapi = {
+      title: 'Yelix Hono API',
+      description: 'Yelix Hono API Documentation',
+      version: '1.0.0',
+    }
 
     // Middleware to initialize a counter for middleware execution.
     this.hono.use('*', async (c, next) => {
@@ -65,6 +69,16 @@ class YelixHono {
         }
       }
     });
+  }
+
+  getOpenAPI() {
+    const openAPIInstance = new OpenAPI()
+      .setTitle(this.__openapi.title)
+      .setDescription(this.__openapi.description)
+      .setVersion(this.__openapi.version);
+
+    openAPIInstance.addEndpoints(this.__endpoints);
+    return openAPIInstance.getJSON();
   }
 
   private async parseAndCloneBody(req: Request) {
@@ -221,6 +235,42 @@ class YelixHono {
     });
   }
 
+  private getMiddlewareByKey(
+    key: string,
+    ...handlers: handlers
+  ): YelixHonoMiddleware | undefined {
+    return handlers
+      .filter((handler) => handler instanceof YelixHonoMiddleware)
+      .find((x) => x.metadata._yelixKeys.includes(key)) as YelixHonoMiddleware;
+  }
+
+  private convertColonRoutesToBraces(path: string): string {
+    return path.replace(/:([^/]+)/g, (_, param) => `{${param}}`);
+  }
+  
+
+  private loadEndpointDocs(
+    path: string,
+    method: string,
+    ...handlers: handlers
+  ) {
+    const openapi = this.getMiddlewareByKey('openapi', ...handlers);
+    const endpointDocs = openapi?.metadata.endpointDocs! as EndpointDocs;
+
+    if (endpointDocs?.hide) return;
+
+    const openapiFriendlyPath = this.convertColonRoutesToBraces(endpointDocs?.path || path);
+
+    const endpointPath = createEndpointBuilder()
+      .setMethod(endpointDocs?.method || method)
+      .setPath(openapiFriendlyPath)
+      .setSummary(endpointDocs?.summary || '')
+      .setDescription(endpointDocs?.description || '')
+      .setTags(endpointDocs?.tags || []);
+
+    this.__endpoints.push(endpointPath);
+  }
+
   /**
    * Registers a POST route with the specified path and handlers.
    * @param path - The route path.
@@ -228,10 +278,13 @@ class YelixHono {
    * @returns The current instance for chaining.
    */
   post(path: string, ...handlers: handlers): this {
+    this.loadEndpointDocs(path, 'post', ...handlers);
+
     const middlewareHandlers = this.parseMiddlewares(handlers);
     this.hono.post(path, ...middlewareHandlers);
     return this;
   }
+
 
   /**
    * Registers a GET route with the specified path and handlers.
@@ -240,6 +293,8 @@ class YelixHono {
    * @returns The current instance for chaining.
    */
   get(path: string, ...handlers: handlers): this {
+    this.loadEndpointDocs(path, 'get', ...handlers);
+
     const middlewareHandlers = this.parseMiddlewares(handlers, true);
     this.hono.get(path, ...middlewareHandlers);
     return this;
@@ -252,6 +307,8 @@ class YelixHono {
    * @returns The current instance for chaining.
    */
   delete(path: string, ...handlers: handlers): this {
+    this.loadEndpointDocs(path, 'delete', ...handlers);
+
     const middlewareHandlers = this.parseMiddlewares(handlers);
     this.hono.delete(path, ...middlewareHandlers);
     return this;
@@ -264,6 +321,8 @@ class YelixHono {
    * @returns The current instance for chaining.
    */
   put(path: string, ...handlers: handlers): this {
+    this.loadEndpointDocs(path, 'put', ...handlers);
+
     const middlewareHandlers = this.parseMiddlewares(handlers);
     this.hono.put(path, ...middlewareHandlers);
     return this;
@@ -276,6 +335,8 @@ class YelixHono {
    * @returns The current instance for chaining.
    */
   patch(path: string, ...handlers: handlers): this {
+    this.loadEndpointDocs(path, 'patch', ...handlers);
+
     const middlewareHandlers = this.parseMiddlewares(handlers);
     this.hono.patch(path, ...middlewareHandlers);
     return this;
@@ -288,6 +349,8 @@ class YelixHono {
    * @returns The current instance for chaining.
    */
   options(path: string, ...handlers: handlers): this {
+    this.loadEndpointDocs(path, 'options', ...handlers);
+
     const middlewareHandlers = this.parseMiddlewares(handlers);
     this.hono.options(path, ...middlewareHandlers);
     return this;
@@ -300,6 +363,10 @@ class YelixHono {
    * @returns The current instance for chaining.
    */
   all(path: string, ...handlers: handlers): this {
+    ['post', 'get', 'put', 'delete', 'patch', 'options'].forEach((method) => {
+      this.loadEndpointDocs(path, method, ...handlers);
+    });
+
     const middlewareHandlers = this.parseMiddlewares(handlers);
     this.hono.all(path, ...middlewareHandlers);
     return this;
@@ -313,6 +380,8 @@ class YelixHono {
    * @returns The current instance for chaining.
    */
   on(method: string, path: string, ...handlers: handlers): this {
+    this.loadEndpointDocs(path, method, ...handlers);
+
     const middlewareHandlers = this.parseMiddlewares(handlers);
     this.hono.on(method, path, ...middlewareHandlers);
     return this;
@@ -347,11 +416,35 @@ class YelixHono {
   route(path: string, instance: YelixHono | Hono): this {
     if (instance instanceof YelixHono) {
       this.hono.route(path, instance.hono);
+      
+      // Merge the endpoints from the mounted instance
+      const endpoints = instance.__endpoints;
+      for (const endpoint of endpoints) {
+        const ePath = endpoint.path;
+        const merged = this.mergePaths(path, ePath);
+        const openapiFriendlyPath = this.convertColonRoutesToBraces(merged);
+        endpoint.setPath(openapiFriendlyPath);
+      }
+      this.__endpoints.push(...endpoints);
     } else {
       this.hono.route(path, instance);
     }
+
     return this;
   }
+
+  private mergePaths(...parts: string[]): string {
+    const merged = parts
+      .map(p => p.trim())                 // remove extra spaces
+      .filter(p => p.length > 0)          // remove empty strings
+      .map((p, i) =>
+        i === 0 ? p.replace(/\/+$/, '')   // first part: remove trailing slashes
+               : p.replace(/^\/+/, '')    // other parts: remove leading slashes
+      )
+      .join('/');
+  
+    return '/' + merged; // always prefix with a single leading slash
+  }  
 
   /**
    * Sets a custom error handler for the application.

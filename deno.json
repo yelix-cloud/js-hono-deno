@@ -1,6 +1,6 @@
 {
   "name": "@yelix/hono",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "exports": "./mod.ts",
   "license": "MIT",
   "tasks": {
@@ -8,7 +8,7 @@
   },
   "imports": {
     "@hono/zod-validator": "npm:@hono/zod-validator@^0.5.0",
-    "@murat/openapi": "jsr:@murat/openapi@^0.1.6",
+    "@murat/openapi": "jsr:@murat/openapi@^0.1.9",
     "@yelix/zod-validator": "jsr:@yelix/zod-validator@^0.1.1",
     "hono": "npm:hono@^4.7.8",
     "zod": "npm:zod@^3.24.3"

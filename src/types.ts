@@ -29,3 +29,18 @@ export type RequestBody =
   | URLSearchParams
   | ReadableStream<Uint8Array>
   | Blob;
+
+export type EndpointDocs = {
+  hide?: boolean;
+  method?: string;
+  path?: string;
+  summary?: string;
+  description?: string;
+  tags?: string[];
+}
+
+export type OpenAPIInformation = {
+  title: string;
+  description: string;
+  version: string;
+}
