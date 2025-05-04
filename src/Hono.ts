@@ -242,7 +242,7 @@ class YelixHono {
   ): YelixHonoMiddleware | undefined {
     return handlers
       .filter((handler) => handler instanceof YelixHonoMiddleware)
-      .find((x) => x.metadata._yelixKeys.includes(key)) as YelixHonoMiddleware;
+      .find((x) => x?.metadata?._yelixKeys?.includes(key)) as YelixHonoMiddleware;
   }
 
   private convertColonRoutesToBraces(path: string): string {
