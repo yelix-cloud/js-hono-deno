@@ -423,6 +423,7 @@ class YelixHono {
       for (const endpoint of endpoints) {
         const ePath = endpoint.path;
         const merged = this.mergePaths(path, ePath);
+        console.log(`-${path}- and -${ePath}- merged to -${merged}-`);
         const openapiFriendlyPath = this.convertColonRoutesToBraces(merged);
         endpoint.setPath(openapiFriendlyPath);
       }
