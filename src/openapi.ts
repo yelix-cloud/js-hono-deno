@@ -1,7 +1,7 @@
-import { namedMiddleware } from './HonoMiddleware.ts';
+import { namedMiddleware, type YelixHonoMiddleware } from './HonoMiddleware.ts';
 import type { EndpointDocs } from './types.ts';
 
-export function openapi(endpointDocs: EndpointDocs) {
+export function openapi(endpointDocs: EndpointDocs): YelixHonoMiddleware {
   return namedMiddleware(
     'openapi',
     async (_c, next) => {

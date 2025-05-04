@@ -2,7 +2,7 @@
   "version": "4",
   "specifiers": {
     "jsr:@murat/openapi@~0.1.9": "0.1.9",
-    "jsr:@yelix/zod-validator@~0.1.1": "0.1.1",
+    "jsr:@yelix/zod-validator@~0.1.1": "0.1.2",
     "npm:@hono/zod-validator@0.5": "0.5.0_hono@4.7.8_zod@3.24.3",
     "npm:hono@^4.7.8": "4.7.8",
     "npm:zod@^3.24.3": "3.24.3"
@@ -11,8 +11,8 @@
     "@murat/openapi@0.1.9": {
       "integrity": "5ae4ec68d2a2c1d9d752bfb7128d0ca998ce0b059b9cb0ca82e37e80298cbe69"
     },
-    "@yelix/zod-validator@0.1.1": {
-      "integrity": "0165e0ab3a701afd60b3dce2c50cd9a4de04c91b07324683ea6486f551b8a944",
+    "@yelix/zod-validator@0.1.2": {
+      "integrity": "bc1cbeb2556117b07739e076ade2a3ec710e549da6fc02d7d3b904c414596ab4",
       "dependencies": [
         "npm:@hono/zod-validator"
       ]
