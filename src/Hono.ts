@@ -14,6 +14,7 @@ import type {
 import {
   createEndpointBuilder,
   OpenAPI,
+  OpenAPICore,
   type EndpointBuilder,
 } from '@murat/openapi';
 import { YelixHonoMiddleware } from './HonoMiddleware.ts';
@@ -71,7 +72,7 @@ class YelixHono {
     });
   }
 
-  getOpenAPI() {
+  getOpenAPI(): OpenAPICore {
     const openAPIInstance = new OpenAPI()
       .setTitle(this.__openapi.title)
       .setDescription(this.__openapi.description)
