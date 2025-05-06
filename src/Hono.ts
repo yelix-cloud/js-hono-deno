@@ -247,30 +247,72 @@ class YelixHono {
       ) as YelixHonoMiddleware;
   }
 
+  private getMiddlewaresByKey(
+    key: string,
+    ...handlers: handlers
+  ): YelixHonoMiddleware[] {
+    return handlers
+      .filter((handler) => handler instanceof YelixHonoMiddleware)
+      .filter((x) =>
+        x?.metadata?._yelixKeys?.includes(key)
+      ) as YelixHonoMiddleware[];
+  }
+
   private convertColonRoutesToBraces(path: string): string {
     return path.replace(/:([^/]+)/g, (_, param) => `{${param}}`);
   }
 
   private loadEndpointDocs(
-    path: string,
-    method: string,
+    _path: string,
+    _method: string,
     ...handlers: handlers
   ) {
     const openapi = this.getMiddlewareByKey('openapi', ...handlers);
     const endpointDocs = openapi?.metadata.endpointDocs! as EndpointDocs;
+    const requestValidations = this.getMiddlewaresByKey(
+      'requestValidation',
+      ...handlers
+    );
+    let haveJson,
+      json = {},
+      haveParameter;
+    const parameters = [];
+
+    for (const requestValidation of requestValidations) {
+      const from = requestValidation.metadata.from;
+      const schema = requestValidation.metadata.schema;
+      if (from === 'json' || from === 'form') {
+        haveJson = true;
+        json = Object.assign(json, schema);
+      } else if (['query', 'header', 'cookie', 'path'].includes(from)) {
+        haveParameter = true;
+        parameters.push(...schema);
+      }
+    }
 
     if (endpointDocs?.hide) return;
 
     const openapiFriendlyPath = this.convertColonRoutesToBraces(
-      endpointDocs?.path || path
+      endpointDocs?.path || _path
     );
+    const method = endpointDocs?.method || _method;
+    const summary = endpointDocs?.summary || `${method.toUpperCase()} ${_path}`;
 
     const endpointPath = createEndpointBuilder()
       .setMethod(endpointDocs?.method || method)
       .setPath(openapiFriendlyPath)
-      .setSummary(endpointDocs?.summary || '')
+      .setSummary(summary)
       .setDescription(endpointDocs?.description || '')
       .setTags(endpointDocs?.tags || []);
+
+    if (haveJson) {
+      endpointPath.setRawRequestBodyContent(json);
+    }
+    if (haveParameter) {
+      parameters.forEach((parameter) => {
+        endpointPath.addRawParameter(parameter);
+      });
+    }
 
     this.__endpoints.push(endpointPath);
   }
