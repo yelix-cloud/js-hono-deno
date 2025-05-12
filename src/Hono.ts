@@ -9,6 +9,7 @@ import type {
   handlers,
   MountOptions,
   EndpointDocs,
+  YelixOptions,
 } from './types.ts';
 import {
   createEndpointBuilder,
@@ -26,13 +27,20 @@ class YelixHono {
   hono: Hono;
   __openapi: OpenAPI;
   __endpoints: EndpointBuilder[] = [];
+  private debug: boolean;
 
   /**
    * @param options - Optional configuration for the Hono instance.
    */
-  constructor(options?: HonoOptions<BlankEnv>) {
+  constructor(
+    options?: HonoOptions<BlankEnv>,
+    yelixOptions: YelixOptions = {
+      debug: false,
+    }
+  ) {
+    this.debug = yelixOptions.debug || false;
     this.hono = new Hono(options);
-    this.__openapi = new OpenAPI()
+    this.__openapi = new OpenAPI({ debug: yelixOptions.debug })
       .setTitle('Yelix Hono API')
       .setDescription('Yelix Hono API Documentation')
       .setVersion('1.0.0');
@@ -41,33 +49,50 @@ class YelixHono {
     this.hono.use('*', async (c, next) => {
       if (!c.get('YELIX_LOGGED' as never)) {
         c.set('YELIX_LOGGED' as never, true);
+        this.log('debug', 'Starting request processing...');
         const requestBody = await this.parseAndCloneBody(c.req.raw);
         requestBody.injectTo(c.req);
+        this.log('debug', `Request body parsed: ${requestBody.type}`);
 
         const start = process.hrtime();
         const url = new URL(c.req.url);
 
         console.group('RS |', url.pathname, c.req.method);
+        this.log(
+          'info',
+          `Request: ${c.req.method} ${url.pathname}, body: ${requestBody.type}`
+        );
 
         if (!c.get('X-Yelix-Middleware-Counter' as never)) {
           c.set('X-Yelix-Middleware-Counter' as never, '0');
+          this.log('debug', 'Initialized middleware counter');
         }
+        this.log('debug', 'Proceeding to next middleware');
         await next();
+        this.log('debug', 'Completed middleware chain execution');
 
         console.groupEnd();
 
         const end = process.hrtime();
         const difference = this.calculateDifference(start, end);
+        this.log('info', `Request completed: ${c.req.method} ${url.pathname}, duration: ${difference}`);
 
         console.log(
           `RE | ${url.pathname}, method: ${c.req.method}, duration: ${difference}`
         );
       } else {
+        this.log('debug', 'Request already logged, skipping log initialization');
         if (next) {
           await next();
         }
       }
     });
+  }
+
+  private log(level: string, message: string): void {
+    if (this.debug) {
+      console.log(`@yelix/hono [${level}] ${message}`);
+    }
   }
 
   getOpenAPI(): OpenAPICore {
@@ -179,12 +204,14 @@ class YelixHono {
         name = `Anonymous_${count}`;
       }
 
+      this.log('debug', `Executing middleware: ${name}`);
       const start = process.hrtime();
       console.group('MS |', name);
       const response = await handler(c, next);
       const end = process.hrtime();
       console.groupEnd();
       const difference = this.calculateDifference(start, end);
+      this.log('info', `Middleware ${name} completed in ${difference}`);
       console.log(`ME | ${name}, duration: ${difference}`);
 
       return response || c.res;
@@ -200,6 +227,7 @@ class YelixHono {
   private parseMiddlewares(Middlewares: handlers, updateNameForHandler = true) {
     if (Middlewares.length < 1) return [];
 
+    this.log('debug', `Parsing ${Middlewares.length} middlewares`);
     // Update the last middleware to have a name
     if (updateNameForHandler) {
       const lastMiddleware = Middlewares[Middlewares.length - 1];
@@ -210,13 +238,16 @@ class YelixHono {
           _yelixKeys: ['handler'],
         }
       );
+      this.log('debug', 'Assigned name "handler" to the last middleware');
       Middlewares[Middlewares.length - 1] = nameAssigned;
     }
 
     return Middlewares.map((handler) => {
       if (handler instanceof YelixHonoMiddleware) {
+        this.log('debug', `Processing named middleware: ${handler.name}`);
         return this.ensureMiddleware(handler.name, handler.handler);
       } else if (typeof handler === 'function') {
+        this.log('debug', 'Processing anonymous middleware function');
         return this.ensureMiddleware(null, handler);
       } else if (
         // Unsafe handler for edge cases
@@ -225,11 +256,13 @@ class YelixHono {
         'handler' in handler &&
         typeof (handler as any).handler === 'function'
       ) {
+        this.log('debug', `Processing object-based middleware: ${(handler as any).name || 'anonymous'}`);
         return this.ensureMiddleware(
           (handler as any).name || null,
           (handler as any).handler
         );
       }
+      this.log('warn', 'Encountered unknown middleware type');
       return handler;
     });
   }
@@ -265,6 +298,7 @@ class YelixHono {
     _method: string,
     ...handlers: handlers
   ) {
+    this.log('debug', `Loading endpoint docs for ${_method.toUpperCase()} ${_path}`);
     const openapi = this.getMiddlewareByKey('openapi', ...handlers);
     const endpointDocs = openapi?.metadata.endpointDocs! as EndpointDocs;
     const requestValidations = this.getMiddlewaresByKey(
@@ -276,19 +310,26 @@ class YelixHono {
       haveParameter;
     const parameters = [];
 
+    this.log('debug', `Found ${requestValidations.length} request validations`);
+    
     for (const requestValidation of requestValidations) {
       const from = requestValidation.metadata.from;
       const schema = requestValidation.metadata.schema;
       if (from === 'json' || from === 'form') {
         haveJson = true;
         json = Object.assign(json, schema);
+        this.log('debug', `Added JSON/form schema from ${from}`);
       } else if (['query', 'header', 'cookie', 'path'].includes(from)) {
         haveParameter = true;
         parameters.push(...schema);
+        this.log('debug', `Added ${schema.length} parameters from ${from}`);
       }
     }
 
-    if (endpointDocs?.hide) return;
+    if (endpointDocs?.hide) {
+      this.log('debug', 'Endpoint marked as hidden, skipping OpenAPI documentation');
+      return;
+    }
 
     const openapiFriendlyPath = this.convertColonRoutesToBraces(
       endpointDocs?.path || _path
@@ -296,6 +337,8 @@ class YelixHono {
     const method = endpointDocs?.method || _method;
     const summary = endpointDocs?.summary || `${method.toUpperCase()} ${_path}`;
 
+    this.log('info', `Creating OpenAPI endpoint for ${method.toUpperCase()} ${openapiFriendlyPath}`);
+    
     const endpointPath = createEndpointBuilder()
       .setMethod(endpointDocs?.method || method)
       .setPath(openapiFriendlyPath)
@@ -304,15 +347,18 @@ class YelixHono {
       .setTags(endpointDocs?.tags || []);
 
     if (haveJson) {
+      this.log('debug', 'Setting request body content');
       endpointPath.setRawRequestBodyContent(json);
     }
     if (haveParameter) {
+      this.log('debug', `Adding ${parameters.length} parameters to endpoint`);
       parameters.forEach((parameter) => {
         endpointPath.addRawParameter(parameter);
       });
     }
 
     this.__endpoints.push(endpointPath);
+    this.log('info', `Added endpoint to OpenAPI: ${method.toUpperCase()} ${openapiFriendlyPath}`);
   }
 
   /**

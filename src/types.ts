@@ -44,3 +44,7 @@ export type OpenAPIInformation = {
   description: string;
   version: string;
 }
+
+export type YelixOptions = {
+  debug?: boolean;
+}
