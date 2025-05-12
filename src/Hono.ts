@@ -9,12 +9,11 @@ import type {
   handlers,
   MountOptions,
   EndpointDocs,
-  OpenAPIInformation,
 } from './types.ts';
 import {
   createEndpointBuilder,
   OpenAPI,
-  OpenAPICore,
+  type OpenAPICore,
   type EndpointBuilder,
 } from '@murat/openapi';
 import { YelixHonoMiddleware } from './HonoMiddleware.ts';
@@ -25,7 +24,7 @@ import { YelixHonoMiddleware } from './HonoMiddleware.ts';
  */
 class YelixHono {
   hono: Hono;
-  __openapi: OpenAPIInformation;
+  __openapi: OpenAPI;
   __endpoints: EndpointBuilder[] = [];
 
   /**
@@ -33,11 +32,10 @@ class YelixHono {
    */
   constructor(options?: HonoOptions<BlankEnv>) {
     this.hono = new Hono(options);
-    this.__openapi = {
-      title: 'Yelix Hono API',
-      description: 'Yelix Hono API Documentation',
-      version: '1.0.0',
-    };
+    this.__openapi = new OpenAPI()
+      .setTitle('Yelix Hono API')
+      .setDescription('Yelix Hono API Documentation')
+      .setVersion('1.0.0');
 
     // Middleware to initialize a counter for middleware execution.
     this.hono.use('*', async (c, next) => {
@@ -73,13 +71,13 @@ class YelixHono {
   }
 
   getOpenAPI(): OpenAPICore {
-    const openAPIInstance = new OpenAPI()
-      .setTitle(this.__openapi.title)
-      .setDescription(this.__openapi.description)
-      .setVersion(this.__openapi.version);
+    const clone = Object.assign(
+      Object.create(Object.getPrototypeOf(this.__openapi)),
+      this.__openapi
+    );
 
-    openAPIInstance.addEndpoints(this.__endpoints);
-    return openAPIInstance.getJSON();
+    clone.addEndpoints(this.__endpoints);
+    return clone.getJSON();
   }
 
   private async parseAndCloneBody(req: Request) {

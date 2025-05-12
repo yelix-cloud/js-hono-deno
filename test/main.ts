@@ -2,8 +2,6 @@
 import { z } from 'zod';
 import { YelixHono } from '../src/Hono.ts';
 import { zValidatorYelix } from '@yelix/zod-validator';
-import { Hono } from 'hono';
-import { zValidator } from '@hono/zod-validator';
 import { openapi } from '../src/openapi.ts';
 
 type Task = {
@@ -17,18 +15,6 @@ const tasks: Task[] = [];
 let nextId = 1; // To simulate auto-incrementing IDs
 
 const app = new YelixHono();
-
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-// app.use('*', async (_c, next) => {
-//   await sleep(100); // Simulate some processing time
-//   await next();
-// });
-
-// app.use('*', async (_c, next) => {
-//   await sleep(200); // Simulate some processing time
-//   await next();
-// });
 
 app
   .post(
