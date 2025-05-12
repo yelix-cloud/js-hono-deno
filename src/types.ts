@@ -1,6 +1,6 @@
 import type { Context } from "hono";
-import type { Next, MiddlewareHandler } from "hono/types";
-import type { YelixHonoMiddleware } from './Hono.ts';
+import type { MiddlewareHandler, Next } from "hono/types";
+import type { YelixHonoMiddleware } from "./Hono.ts";
 
 export type HonoBasedHandlers =
   | ((c: Context, next: Next) => Response | Promise<Response>)
@@ -17,9 +17,9 @@ export type MountReplaceRequest = (originalRequest: Request) => Request;
 export type MountOptions =
   | MountOptionHandler
   | {
-      optionHandler?: MountOptionHandler;
-      replaceRequest?: MountReplaceRequest | false;
-    };
+    optionHandler?: MountOptionHandler;
+    replaceRequest?: MountReplaceRequest | false;
+  };
 export type RequestBody =
   | string
   | object
@@ -37,14 +37,14 @@ export type EndpointDocs = {
   summary?: string;
   description?: string;
   tags?: string[];
-}
+};
 
 export type OpenAPIInformation = {
   title: string;
   description: string;
   version: string;
-}
+};
 
 export type YelixOptions = {
   debug?: boolean;
-}
+};

@@ -18,7 +18,7 @@ export class YelixHonoMiddleware {
     name: string,
     handler: HonoBasedHandlers,
     // deno-lint-ignore no-explicit-any
-    metadata: Record<string, any> = {}
+    metadata: Record<string, any> = {},
   ) {
     this.handler = handler;
     this.name = name;
@@ -28,18 +28,18 @@ export class YelixHonoMiddleware {
 
 /**
  * Creates a named middleware handler with additional metadata.
- * 
+ *
  * @param name - The name of the middleware.
  * @param handler - The middleware handler function.
  * @param metadata - Additional metadata for the middleware.
- * 
+ *
  * @returns A new instance of YelixHonoMiddleware.
  */
 export function namedMiddleware(
   name: string,
   handler: HonoBasedHandlers,
   // deno-lint-ignore no-explicit-any
-  metadata: Record<string, any> = {}
+  metadata: Record<string, any> = {},
 ): YelixHonoMiddleware {
   return new YelixHonoMiddleware(name, handler, metadata);
 }
