@@ -360,67 +360,172 @@ class YelixHono {
     _method: string,
     ...handlers: handlers
   ) {
+    // Log initial call with path, method and handler count
     this.log(
       "debug",
       `Loading endpoint docs for ${_method.toUpperCase()} ${_path}`,
-      { path: _path, method: _method, handlersCount: handlers.length },
+      { 
+        path: _path, 
+        method: _method.toUpperCase(), 
+        handlersCount: handlers.length,
+        handlerTypes: handlers.map(h => 
+          h instanceof YelixHonoMiddleware ? 
+            `YelixHonoMiddleware:${h.name}` : 
+            typeof h === 'function' ? 
+              `Function:${h.name || 'anonymous'}` : 
+              `Other:${typeof h}`
+        )
+      },
     );
+    
+    // Get OpenAPI middleware if it exists
     const openapi = this.getMiddlewareByKey("openapi", ...handlers);
+    
+    // Log OpenAPI middleware details
+    this.log("debug", `OpenAPI middleware ${openapi ? "found" : "not found"}`, {
+      middlewareName: openapi?.name,
+      keys: openapi?.metadata?._yelixKeys,
+      hasEndpointDocs: openapi?.metadata?.endpointDocs ? true : false,
+      allMetadataKeys: openapi ? Object.keys(openapi.metadata || {}) : []
+    });
+    
     const endpointDocs = openapi?.metadata.endpointDocs! as EndpointDocs;
+    
+    // Log endpoint docs details if they exist
+    if (endpointDocs) {
+      this.log("debug", "Endpoint docs found", {
+        endpointDocs,
+        customPath: endpointDocs.path !== _path,
+        customMethod: endpointDocs.method !== _method,
+        hasDescription: !!endpointDocs.description,
+        hasTags: Array.isArray(endpointDocs.tags) && endpointDocs.tags.length > 0,
+        isHidden: !!endpointDocs.hide
+      });
+    } else {
+      this.log("debug", "No endpoint docs found, will use defaults", {
+        defaultPath: _path,
+        defaultMethod: _method
+      });
+    }
+    
+    // Get request validation middlewares
     const requestValidations = this.getMiddlewaresByKey(
       "requestValidation",
       ...handlers,
     );
-    let haveJson,
-      json = {},
-      haveParameter;
-    const parameters = [];
-
+    
+    // Log request validation middleware count
     this.log(
       "debug",
       `Found ${requestValidations.length} request validations`,
       {
         validationsCount: requestValidations.length,
+        validationMiddlewareNames: requestValidations.map(rv => rv.name),
       },
     );
-
+    
+    let haveJson = false,
+      json = {},
+      haveParameter = false;
+    const parameters = [];
+    
+    // Process each request validation middleware
     for (const requestValidation of requestValidations) {
       const from = requestValidation.metadata.from;
       const schema = requestValidation.metadata.schema;
+      
+      this.log("debug", `Processing request validation from ${from}`, {
+        validationName: requestValidation.name,
+        from,
+        hasSchema: !!schema,
+        schemaType: schema ? typeof schema : 'undefined',
+        isArray: Array.isArray(schema),
+        keys: schema && typeof schema === 'object' ? Object.keys(schema) : []
+      });
+      
       if (from === "json" || from === "form") {
         haveJson = true;
-        json = Object.assign(json, schema);
-        this.log("debug", `Added JSON/form schema from ${from}`, {
-          from,
-          schemaKeys: Object.keys(schema),
-        });
+        try {
+          json = Object.assign(json, schema);
+          this.log("debug", `Added JSON/form schema from ${from}`, {
+            from,
+            schemaKeys: Object.keys(schema),
+            combinedKeys: Object.keys(json),
+            schemaContent: JSON.stringify(schema).substring(0, 200) + '...',
+            validationName: requestValidation.name
+          });
+        } catch (error) {
+          this.log("error", `Failed to process ${from} schema`, {
+            error,
+            from,
+            schema,
+            validationName: requestValidation.name
+          });
+        }
       } else if (["query", "header", "cookie", "path"].includes(from)) {
         haveParameter = true;
-        parameters.push(...schema);
-        this.log("debug", `Added ${schema.length} parameters from ${from}`, {
+        try {
+          // Log each parameter being added
+          if (Array.isArray(schema)) {
+            this.log("debug", `Adding ${schema.length} parameters from ${from}`, {
+              parametersToAdd: schema.map(p => ({
+                name: p.name,
+                in: p.in,
+                required: p.required,
+                schema: p.schema
+              }))
+            });
+            parameters.push(...schema);
+          } else {
+            this.log("warn", `Schema for ${from} is not an array as expected`, {
+              schema,
+              validationName: requestValidation.name
+            });
+          }
+        } catch (error) {
+          this.log("error", `Failed to process ${from} parameters`, {
+            error,
+            from,
+            schema,
+            validationName: requestValidation.name
+          });
+        }
+      } else {
+        this.log("warn", `Unknown validation source: ${from}`, {
+          validationName: requestValidation.name,
           from,
-          count: schema.length,
-          parameterNames: schema.map((p: { name?: string; in?: string }) =>
-            p.name || p.in
-          ),
+          knownSources: ["json", "form", "query", "header", "cookie", "path"]
         });
       }
     }
-
+    
+    // If endpoint is marked as hidden, skip OpenAPI documentation
     if (endpointDocs?.hide) {
       this.log(
         "debug",
         "Endpoint marked as hidden, skipping OpenAPI documentation",
+        { path: _path, method: _method }
       );
       return;
     }
-
+    
+    // Convert path format for OpenAPI
     const openapiFriendlyPath = this.convertColonRoutesToBraces(
       endpointDocs?.path || _path,
     );
+    
+    // Log path conversion
+    if (openapiFriendlyPath !== (endpointDocs?.path || _path)) {
+      this.log("debug", "Converted route path for OpenAPI compatibility", {
+        originalPath: endpointDocs?.path || _path,
+        convertedPath: openapiFriendlyPath,
+        replacements: (endpointDocs?.path || _path).match(/:([^/]+)/g)
+      });
+    }
+    
     const method = endpointDocs?.method || _method;
     const summary = endpointDocs?.summary || `${method.toUpperCase()} ${_path}`;
-
+    
     this.log(
       "info",
       `Creating OpenAPI endpoint for ${method.toUpperCase()} ${openapiFriendlyPath}`,
@@ -428,38 +533,95 @@ class YelixHono {
         method: method.toUpperCase(),
         path: openapiFriendlyPath,
         summary,
+        description: endpointDocs?.description || "",
+        tags: endpointDocs?.tags || [],
+        hasRequestBody: haveJson,
+        hasParameters: haveParameter,
+        parameterCount: parameters.length
       },
     );
-
-    const endpointPath = createEndpointBuilder()
-      .setMethod(endpointDocs?.method || method)
-      .setPath(openapiFriendlyPath)
-      .setSummary(summary)
-      .setDescription(endpointDocs?.description || "")
-      .setTags(endpointDocs?.tags || []);
-
-    if (haveJson) {
-      this.log("debug", "Setting request body content", {
-        contentKeys: Object.keys(json),
+    
+    try {
+      // Create the endpoint builder
+      const endpointPath = createEndpointBuilder()
+        .setMethod(endpointDocs?.method || method)
+        .setPath(openapiFriendlyPath)
+        .setSummary(summary)
+        .setDescription(endpointDocs?.description || "")
+        .setTags(endpointDocs?.tags || []);
+      
+      this.log("debug", "Created endpoint builder", {
+        builderMethod: endpointPath.method,
+        builderPath: endpointPath.path,
       });
-      endpointPath.setRawRequestBodyContent(json);
+      
+      // Add request body if we have JSON schema
+      if (haveJson) {
+        try {
+          this.log("debug", "Setting request body content", {
+            contentKeys: Object.keys(json),
+            jsonPreview: JSON.stringify(json).substring(0, 200) + '...',
+            contentType: "application/json"
+          });
+          endpointPath.setRawRequestBodyContent(json);
+        } catch (error) {
+          this.log("error", "Failed to set request body content", {
+            error,
+            jsonKeys: Object.keys(json)
+          });
+        }
+      }
+      
+      // Add parameters if we have any
+      if (haveParameter) {
+        this.log("debug", `Adding ${parameters.length} parameters to endpoint`, {
+          count: parameters.length,
+          types: [...new Set(parameters.map((p) => p.in))],
+          parametersList: parameters.map(p => ({
+            name: p.name,
+            in: p.in,
+            required: p.required
+          }))
+        });
+        
+        // Add each parameter individually and log any errors
+        parameters.forEach((parameter, index) => {
+          try {
+            this.log("debug", `Adding parameter: ${parameter.name || index}`, {
+              parameter,
+              index
+            });
+            endpointPath.addRawParameter(parameter);
+          } catch (error) {
+            this.log("error", `Failed to add parameter: ${parameter.name || index}`, {
+              error,
+              parameter,
+              index
+            });
+          }
+        });
+      }
+      
+      // Add the endpoint to our collection
+      this.__endpoints.push(endpointPath);
+      this.log(
+        "info",
+        `Added endpoint to OpenAPI: ${method.toUpperCase()} ${openapiFriendlyPath}`,
+        { 
+          total: this.__endpoints.length,
+          endpointMethod: endpointPath.method,
+          endpointPath: endpointPath.path,
+          index: this.__endpoints.length - 1
+        },
+      );
+    } catch (error) {
+      this.log("error", "Failed to create OpenAPI endpoint", {
+        error,
+        path: openapiFriendlyPath,
+        method,
+        summary
+      });
     }
-    if (haveParameter) {
-      this.log("debug", `Adding ${parameters.length} parameters to endpoint`, {
-        count: parameters.length,
-        types: [...new Set(parameters.map((p) => p.in))],
-      });
-      parameters.forEach((parameter) => {
-        endpointPath.addRawParameter(parameter);
-      });
-    }
-
-    this.__endpoints.push(endpointPath);
-    this.log(
-      "info",
-      `Added endpoint to OpenAPI: ${method.toUpperCase()} ${openapiFriendlyPath}`,
-      { total: this.__endpoints.length },
-    );
   }
 
   /**
