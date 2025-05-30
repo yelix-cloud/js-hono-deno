@@ -128,7 +128,6 @@ class YelixHono {
       this.__openapi,
     );
 
-    console.log('endpoints', this.__endpoints);
     clone.addEndpoints(this.__endpoints);
     return clone.getJSON();
   }
