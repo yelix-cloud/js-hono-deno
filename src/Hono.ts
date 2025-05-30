@@ -128,6 +128,7 @@ class YelixHono {
       this.__openapi,
     );
 
+    console.log('endpoints', this.__endpoints);
     clone.addEndpoints(this.__endpoints);
     return clone.getJSON();
   }
@@ -344,8 +345,8 @@ class YelixHono {
     key: string,
     ...handlers: handlers
   ): YelixHonoMiddleware[] {
-    return handlers
-      .filter((handler) => handler instanceof YelixHonoMiddleware)
+    return (handlers as YelixHonoMiddleware[]) // unsafe cast
+      .filter((handler) => !!handler?.name) // Ensure we only process named middlewares, to safe cast
       .filter((x) =>
         x?.metadata?._yelixKeys?.includes(key)
       ) as YelixHonoMiddleware[];
@@ -369,7 +370,7 @@ class YelixHono {
         method: _method.toUpperCase(), 
         handlersCount: handlers.length,
         handlerTypes: handlers.map(h => 
-          h instanceof YelixHonoMiddleware ? 
+          h?.name ? 
             `YelixHonoMiddleware:${h.name}` : 
             typeof h === 'function' ? 
               `Function:${h.name || 'anonymous'}` : 
@@ -383,6 +384,7 @@ class YelixHono {
     
     // Log OpenAPI middleware details
     this.log("debug", `OpenAPI middleware ${openapi ? "found" : "not found"}`, {
+      path: _path,
       middlewareName: openapi?.name,
       keys: openapi?.metadata?._yelixKeys,
       hasEndpointDocs: openapi?.metadata?.endpointDocs ? true : false,
@@ -667,6 +669,10 @@ class YelixHono {
    * @returns The current instance for chaining.
    */
   delete(path: string, ...handlers: handlers): this {
+    this.log("debug", `Registering DELETE route: ${path}`, {
+      path,
+      handlersCount: handlers.length,
+    });
     this.loadEndpointDocs(path, "delete", ...handlers);
 
     const middlewareHandlers = this.parseMiddlewares(handlers);
@@ -681,6 +687,10 @@ class YelixHono {
    * @returns The current instance for chaining.
    */
   put(path: string, ...handlers: handlers): this {
+    this.log("debug", `Registering PUT route: ${path}`, {
+      path,
+      handlersCount: handlers.length,
+    });
     this.loadEndpointDocs(path, "put", ...handlers);
 
     const middlewareHandlers = this.parseMiddlewares(handlers);
@@ -695,6 +705,10 @@ class YelixHono {
    * @returns The current instance for chaining.
    */
   patch(path: string, ...handlers: handlers): this {
+    this.log("debug", `Registering PATCH route: ${path}`, {
+      path,
+      handlersCount: handlers.length,
+    });
     this.loadEndpointDocs(path, "patch", ...handlers);
 
     const middlewareHandlers = this.parseMiddlewares(handlers);
@@ -709,6 +723,10 @@ class YelixHono {
    * @returns The current instance for chaining.
    */
   options(path: string, ...handlers: handlers): this {
+    this.log("debug", `Registering OPTIONS route: ${path}`, {
+      path,
+      handlersCount: handlers.length,
+    });
     this.loadEndpointDocs(path, "options", ...handlers);
 
     const middlewareHandlers = this.parseMiddlewares(handlers);
@@ -723,6 +741,10 @@ class YelixHono {
    * @returns The current instance for chaining.
    */
   all(path: string, ...handlers: handlers): this {
+    this.log("debug", `Registering ALL route: ${path}`, {
+      path,
+      handlersCount: handlers.length,
+    });
     ["post", "get", "put", "delete", "patch", "options"].forEach((method) => {
       this.loadEndpointDocs(path, method, ...handlers);
     });
@@ -740,6 +762,11 @@ class YelixHono {
    * @returns The current instance for chaining.
    */
   on(method: string, path: string, ...handlers: handlers): this {
+    this.log("debug", `Registering ${method.toUpperCase()} route: ${path}`, {
+      path,
+      method: method.toUpperCase(),
+      handlersCount: handlers.length,
+    });
     this.loadEndpointDocs(path, method, ...handlers);
 
     const middlewareHandlers = this.parseMiddlewares(handlers);
