@@ -1,15 +1,31 @@
 {
-  "version": "4",
+  "version": "5",
   "specifiers": {
     "jsr:@murat/openapi@~0.1.16": "0.1.16",
+    "jsr:@yelix/openapi@0.1.17": "0.1.17",
+    "jsr:@yelix/sdk@*": "0.1.9",
+    "jsr:@yelix/sdk@~0.1.9": "0.1.9",
     "jsr:@yelix/zod-validator@~0.1.5": "0.1.5",
     "npm:@hono/zod-validator@0.5": "0.5.0_hono@4.7.8_zod@3.24.3",
+    "npm:@types/node@*": "22.15.15",
     "npm:hono@^4.7.8": "4.7.8",
     "npm:zod@^3.24.3": "3.24.3"
   },
   "jsr": {
     "@murat/openapi@0.1.16": {
       "integrity": "5c424dd138a793cdcede7b2df8d04cfa8972f92964d62413fbc2a66fbca2fee4"
+    },
+    "@yelix/openapi@0.1.17": {
+      "integrity": "648b99fe1c06a62e8555abea353747305f3459904a9c5c063053804198def177"
+    },
+    "@yelix/sdk@0.1.1": {
+      "integrity": "6f27994ad644daca2e416d288b6a4f846187b7147683a57f807bd5ea083fa4f3",
+      "dependencies": [
+        "jsr:@yelix/openapi"
+      ]
+    },
+    "@yelix/sdk@0.1.9": {
+      "integrity": "f0a1b626e8d75c0f0f703b74b2d0ddc205b29a931c84087020fbe20c3b3d1f40"
     },
     "@yelix/zod-validator@0.1.5": {
       "integrity": "a710156fe7662e1cda7fcfe4d1d4324d2f387237399fd1407e4a18a0f1073a42",
@@ -27,8 +43,17 @@
         "zod"
       ]
     },
+    "@types/node@22.15.15": {
+      "integrity": "sha512-R5muMcZob3/Jjchn5LcO8jdKwSCbzqmPB6ruBxMcf9kbxtniZHP327s6C37iOfuw8mbKK3cAQa7sEl7afLrQ8A==",
+      "dependencies": [
+        "undici-types"
+      ]
+    },
     "hono@4.7.8": {
       "integrity": "sha512-PCibtFdxa7/Ldud9yddl1G81GjYaeMYYTq4ywSaNsYbB1Lug4mwtOMJf2WXykL0pntYwmpRJeOI3NmoDgD+Jxw=="
+    },
+    "undici-types@6.21.0": {
+      "integrity": "sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ=="
     },
     "zod@3.24.3": {
       "integrity": "sha512-HhY1oqzWCQWuUqvBFnsyrtZRhyPeR7SUGv+C4+MsisMuVfSPx8HpwWqH8tRahSlt6M3PiFAcoeFhZAqIXTxoSg=="
@@ -37,6 +62,7 @@
   "workspace": {
     "dependencies": [
       "jsr:@murat/openapi@~0.1.16",
+      "jsr:@yelix/sdk@~0.1.9",
       "jsr:@yelix/zod-validator@~0.1.5",
       "npm:@hono/zod-validator@0.5",
       "npm:hono@^4.7.8",

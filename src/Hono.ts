@@ -1,8 +1,8 @@
 // deno-lint-ignore-file no-explicit-any
-import { type Context, type ExecutionContext, Hono, type Next } from "hono";
-import process from "node:process";
-import type { HonoOptions } from "hono/hono-base";
-import type { BlankEnv } from "hono/types";
+import { type Context, type ExecutionContext, Hono, type Next } from 'hono';
+import process from 'node:process';
+import type { HonoOptions } from 'hono/hono-base';
+import type { BlankEnv } from 'hono/types';
 import type {
   EndpointDocs,
   handlers,
@@ -10,14 +10,23 @@ import type {
   MountOptions,
   RequestBody,
   YelixOptions,
-} from "./types.ts";
+  YelixOptionsParams,
+} from './types.ts';
 import {
   createEndpointBuilder,
   type EndpointBuilder,
   OpenAPI,
   type OpenAPICore,
-} from "@murat/openapi";
-import { YelixHonoMiddleware } from "./HonoMiddleware.ts";
+} from '@murat/openapi';
+import { YelixHonoMiddleware } from './HonoMiddleware.ts';
+import { YelixCloud } from 'jsr:@yelix/sdk';
+import { date } from 'zod';
+
+const yelixOptionsDefaults: YelixOptions = {
+  environment: 'development',
+  debug: false,
+  apiKey: undefined,
+};
 
 /**
  * A wrapper around the Hono framework with additional features like middleware parsing,
@@ -28,35 +37,43 @@ class YelixHono {
   __openapi: OpenAPI;
   __endpoints: EndpointBuilder[] = [];
   private debug: boolean;
+  private config: YelixOptions = yelixOptionsDefaults;
+  private yelixCloud: YelixCloud | 'Not-Initialized' | 'Not-Available' =
+    'Not-Initialized';
 
   /**
    * @param options - Optional configuration for the Hono instance.
    */
   constructor(
     options?: HonoOptions<BlankEnv>,
-    yelixOptions: YelixOptions = {
-      debug: false,
-    },
+    yelixOptions?: YelixOptionsParams
   ) {
-    this.debug = yelixOptions.debug || false;
+    this.config = { ...yelixOptionsDefaults, ...yelixOptions };
+
+    if (this.config.apiKey) {
+      this.yelixCloud = new YelixCloud(this.config.apiKey);
+    } else {
+      this.yelixCloud = 'Not-Available';
+    }
+    this.debug = this.config.debug || false;
     this.hono = new Hono(options);
-    this.__openapi = new OpenAPI({ debug: yelixOptions.debug })
-      .setTitle("Yelix Hono API")
-      .setDescription("Yelix Hono API Documentation")
-      .setVersion("1.0.0");
+    this.__openapi = new OpenAPI({ debug: this.config.debug })
+      .setTitle('Yelix Hono API')
+      .setDescription('Yelix Hono API Documentation')
+      .setVersion('1.0.0');
 
     // Middleware to initialize a counter for middleware execution.
-    this.hono.use("*", async (c, next) => {
-      if (!c.get("YELIX_LOGGED" as never)) {
-        c.set("YELIX_LOGGED" as never, true);
-        this.log("debug", "Starting request processing...", {
+    this.hono.use('*', async (c, next) => {
+      if (!c.get('YELIX_LOGGED' as never)) {
+        c.set('YELIX_LOGGED' as never, true);
+        this.log('debug', 'Starting request processing...', {
           url: c.req.url,
           method: c.req.method,
           headers: Object.fromEntries([...c.req.raw.headers.entries()]),
         });
         const requestBody = await this.parseAndCloneBody(c.req.raw);
         requestBody.injectTo(c.req);
-        this.log("debug", `Request body parsed: ${requestBody.type}`, {
+        this.log('debug', `Request body parsed: ${requestBody.type}`, {
           bodyType: requestBody.type,
           hasContent: !!requestBody.parsed,
         });
@@ -64,43 +81,57 @@ class YelixHono {
         const start = process.hrtime();
         const url = new URL(c.req.url);
 
-        console.group("RS |", url.pathname, c.req.method);
+        console.group('RS |', url.pathname, c.req.method);
         this.log(
-          "info",
+          'info',
           `Request: ${c.req.method} ${url.pathname}, body: ${requestBody.type}`,
-          { pathname: url.pathname, search: url.search },
+          { pathname: url.pathname, search: url.search }
         );
 
-        if (!c.get("X-Yelix-Middleware-Counter" as never)) {
-          c.set("X-Yelix-Middleware-Counter" as never, "0");
-          this.log("debug", "Initialized middleware counter");
+        if (!c.get('X-Yelix-Middleware-Counter' as never)) {
+          c.set('X-Yelix-Middleware-Counter' as never, '0');
+          this.log('debug', 'Initialized middleware counter');
         }
-        this.log("debug", "Proceeding to next middleware");
+        this.log('debug', 'Proceeding to next middleware');
         await next();
-        this.log("debug", "Completed middleware chain execution");
+        this.log('debug', 'Completed middleware chain execution');
 
         console.groupEnd();
 
         const end = process.hrtime();
         const difference = this.calculateDifference(start, end);
         this.log(
-          "info",
+          'info',
           `Request completed: ${c.req.method} ${url.pathname}, duration: ${difference}`,
           {
             status: c.res.status,
             duration: difference,
             pathname: url.pathname,
-          },
+          }
         );
 
         console.log(
-          `RE | ${url.pathname}, method: ${c.req.method}, duration: ${difference}`,
+          `RE | ${url.pathname}, method: ${c.req.method}, duration: ${difference}`
         );
+        if (
+          this.yelixCloud !== 'Not-Initialized' &&
+          this.yelixCloud !== 'Not-Available'
+        ) {
+          const initializeYelixCloud = this.yelixCloud.logRequest({
+            startTime: Date.now(),
+            path: url.pathname,
+            duration: this.calculateDifferenceInMSFormat(start, end),
+            method: c.req.method,
+          });
+          if (typeof initializeYelixCloud === 'function') {
+            initializeYelixCloud(this.config.environment, this.getOpenAPI());
+          }
+        }
       } else {
         this.log(
-          "debug",
-          "Request already logged, skipping log initialization",
-          { url: c.req.url },
+          'debug',
+          'Request already logged, skipping log initialization',
+          { url: c.req.url }
         );
         if (next) {
           await next();
@@ -125,7 +156,7 @@ class YelixHono {
   getOpenAPI(): OpenAPICore {
     const clone = Object.assign(
       Object.create(Object.getPrototypeOf(this.__openapi)),
-      this.__openapi,
+      this.__openapi
     );
 
     clone.addEndpoints(this.__endpoints);
@@ -133,35 +164,35 @@ class YelixHono {
   }
 
   private async parseAndCloneBody(req: Request) {
-    const contentType = req.headers.get("content-type") || "";
+    const contentType = req.headers.get('content-type') || '';
     const clone = req.clone();
 
-    let type: "json" | "formData" | "text" | "arrayBuffer" | "blob" | "none" =
-      "none";
+    let type: 'json' | 'formData' | 'text' | 'arrayBuffer' | 'blob' | 'none' =
+      'none';
     let parsed: RequestBody | undefined;
 
-    if (contentType.includes("application/json")) {
+    if (contentType.includes('application/json')) {
       const json = await clone.json();
-      type = "json";
+      type = 'json';
       parsed = json;
     } else if (
-      contentType.includes("multipart/form-data") ||
-      contentType.includes("application/x-www-form-urlencoded")
+      contentType.includes('multipart/form-data') ||
+      contentType.includes('application/x-www-form-urlencoded')
     ) {
       const formData = await clone.formData();
-      type = "formData";
+      type = 'formData';
       parsed = formData;
-    } else if (contentType.includes("text/plain")) {
+    } else if (contentType.includes('text/plain')) {
       const text = await clone.text();
-      type = "text";
+      type = 'text';
       parsed = text;
-    } else if (contentType.includes("application/octet-stream")) {
+    } else if (contentType.includes('application/octet-stream')) {
       const buffer = await clone.arrayBuffer();
-      type = "arrayBuffer";
+      type = 'arrayBuffer';
       parsed = buffer;
-    } else if (contentType.includes("application/blob")) {
+    } else if (contentType.includes('application/blob')) {
       const blob = await clone.blob();
-      type = "blob";
+      type = 'blob';
       parsed = blob;
     }
 
@@ -185,7 +216,7 @@ class YelixHono {
    */
   private calculateDifference(
     st: [number, number],
-    et: [number, number],
+    et: [number, number]
   ): string {
     const diffInNanoSeconds = (et[0] - st[0]) * 1e9 + (et[1] - st[1]); // Difference in nanoseconds
 
@@ -204,7 +235,7 @@ class YelixHono {
       // 1s to 10s -> <seconds>.<ms>s
       const seconds = Math.floor(diffInNanoSeconds / 1000000000);
       const milliseconds = Math.floor(
-        (diffInNanoSeconds % 1000000000) / 1000000,
+        (diffInNanoSeconds % 1000000000) / 1000000
       );
       return `${seconds}.${milliseconds}s`;
     } else {
@@ -212,6 +243,16 @@ class YelixHono {
       const seconds = Math.floor(diffInNanoSeconds / 1000000000);
       return `${seconds}s`;
     }
+  }
+
+  private calculateDifferenceInMSFormat(
+    st: [number, number],
+    et: [number, number]
+  ): number {
+    // x ms and y ns difference to x.yms like 23.3ms means 23 milliseconds and 300 nanoseconds difference and if y is 0 then it will be 23ms
+    const diffInNanoSeconds = (et[0] - st[0]) * 1e9 + (et[1] - st[1]); // Difference in nanoseconds
+    const milliseconds = diffInNanoSeconds / 1e6; // Convert to milliseconds
+    return milliseconds;
   }
 
   /**
@@ -222,29 +263,29 @@ class YelixHono {
    */
   private ensureMiddleware(name: string | null, handler: HonoBasedHandlers) {
     return async (c: Context, next: Next) => {
-      let count = c.get("X-Yelix-Middleware-Counter") ?? "";
-      if (count === "" || isNaN(Number(count))) {
-        count = "0";
+      let count = c.get('X-Yelix-Middleware-Counter') ?? '';
+      if (count === '' || isNaN(Number(count))) {
+        count = '0';
       }
-      c.set("X-Yelix-Middleware-Counter", String(Number(count) + 1));
+      c.set('X-Yelix-Middleware-Counter', String(Number(count) + 1));
       if (!name) {
         name = `Anonymous_${count}`;
       }
 
-      this.log("debug", `Executing middleware: ${name}`, {
+      this.log('debug', `Executing middleware: ${name}`, {
         middlewareName: name,
         count: Number(count),
         url: c.req.url,
       });
       const start = process.hrtime();
-      console.group("MS |", name);
+      console.group('MS |', name);
 
       try {
         const response = await handler(c, next);
         const end = process.hrtime();
         console.groupEnd();
         const difference = this.calculateDifference(start, end);
-        this.log("info", `Middleware ${name} completed in ${difference}`, {
+        this.log('info', `Middleware ${name} completed in ${difference}`, {
           middlewareName: name,
           duration: difference,
           status: c.res.status,
@@ -256,7 +297,7 @@ class YelixHono {
         console.groupEnd();
         const difference = this.calculateDifference(start, end);
 
-        this.log("error", `Middleware ${name} failed after ${difference}`, {
+        this.log('error', `Middleware ${name} failed after ${difference}`, {
           middlewareName: name,
           duration: difference,
           error: error,
@@ -277,7 +318,7 @@ class YelixHono {
   private parseMiddlewares(Middlewares: handlers, updateNameForHandler = true) {
     if (Middlewares.length < 1) return [];
 
-    this.log("debug", `Parsing ${Middlewares.length} middlewares`, {
+    this.log('debug', `Parsing ${Middlewares.length} middlewares`, {
       count: Middlewares.length,
       updateNameForHandler,
     });
@@ -285,44 +326,44 @@ class YelixHono {
     if (updateNameForHandler) {
       const lastMiddleware = Middlewares[Middlewares.length - 1];
       const nameAssigned = new YelixHonoMiddleware(
-        "handler",
+        'handler',
         lastMiddleware as HonoBasedHandlers,
         {
-          _yelixKeys: ["handler"],
-        },
+          _yelixKeys: ['handler'],
+        }
       );
-      this.log("debug", 'Assigned name "handler" to the last middleware');
+      this.log('debug', 'Assigned name "handler" to the last middleware');
       Middlewares[Middlewares.length - 1] = nameAssigned;
     }
 
     return Middlewares.map((handler) => {
       if (handler instanceof YelixHonoMiddleware) {
-        this.log("debug", `Processing named middleware: ${handler.name}`, {
+        this.log('debug', `Processing named middleware: ${handler.name}`, {
           middlewareName: handler.name,
           keys: handler.metadata?._yelixKeys,
         });
         return this.ensureMiddleware(handler.name, handler.handler);
-      } else if (typeof handler === "function") {
-        this.log("debug", "Processing anonymous middleware function", {
-          handlerType: "function",
+      } else if (typeof handler === 'function') {
+        this.log('debug', 'Processing anonymous middleware function', {
+          handlerType: 'function',
         });
         return this.ensureMiddleware(null, handler);
       } else if (
         // Unsafe handler for edge cases
         handler &&
-        typeof handler === "object" &&
-        "handler" in handler &&
-        typeof (handler as any).handler === "function"
+        typeof handler === 'object' &&
+        'handler' in handler &&
+        typeof (handler as any).handler === 'function'
       ) {
-        const handlerName = (handler as any).name || "anonymous";
+        const handlerName = (handler as any).name || 'anonymous';
         this.log(
-          "debug",
+          'debug',
           `Processing object-based middleware: ${handlerName}`,
-          { handlerType: "object", name: handlerName },
+          { handlerType: 'object', name: handlerName }
         );
         return this.ensureMiddleware(handlerName, (handler as any).handler);
       }
-      this.log("warn", "Encountered unknown middleware type", {
+      this.log('warn', 'Encountered unknown middleware type', {
         handlerType: typeof handler,
       });
       return handler;
@@ -362,265 +403,278 @@ class YelixHono {
   ) {
     // Log initial call with path, method and handler count
     this.log(
-      "debug",
+      'debug',
       `Loading endpoint docs for ${_method.toUpperCase()} ${_path}`,
-      { 
-        path: _path, 
-        method: _method.toUpperCase(), 
+      {
+        path: _path,
+        method: _method.toUpperCase(),
         handlersCount: handlers.length,
-        handlerTypes: handlers.map(h => 
-          h?.name ? 
-            `YelixHonoMiddleware:${h.name}` : 
-            typeof h === 'function' ? 
-              `Function:${h.name || 'anonymous'}` : 
-              `Other:${typeof h}`
-        )
-      },
+        handlerTypes: handlers.map((h) =>
+          h?.name
+            ? `YelixHonoMiddleware:${h.name}`
+            : typeof h === 'function'
+            ? `Function:${h.name || 'anonymous'}`
+            : `Other:${typeof h}`
+        ),
+      }
     );
-    
+
     // Get OpenAPI middleware if it exists
-    const openapi = this.getMiddlewareByKey("openapi", ...handlers);
-    
+    const openapi = this.getMiddlewareByKey('openapi', ...handlers);
+
     // Log OpenAPI middleware details
-    this.log("debug", `OpenAPI middleware ${openapi ? "found" : "not found"}`, {
+    this.log('debug', `OpenAPI middleware ${openapi ? 'found' : 'not found'}`, {
       path: _path,
       middlewareName: openapi?.name,
       keys: openapi?.metadata?._yelixKeys,
       hasEndpointDocs: openapi?.metadata?.endpointDocs ? true : false,
-      allMetadataKeys: openapi ? Object.keys(openapi.metadata || {}) : []
+      allMetadataKeys: openapi ? Object.keys(openapi.metadata || {}) : [],
     });
-    
+
     const endpointDocs = openapi?.metadata.endpointDocs! as EndpointDocs;
-    
+
     // Log endpoint docs details if they exist
     if (endpointDocs) {
-      this.log("debug", "Endpoint docs found", {
+      this.log('debug', 'Endpoint docs found', {
         endpointDocs,
         customPath: endpointDocs.path !== _path,
         customMethod: endpointDocs.method !== _method,
         hasDescription: !!endpointDocs.description,
-        hasTags: Array.isArray(endpointDocs.tags) && endpointDocs.tags.length > 0,
-        isHidden: !!endpointDocs.hide
+        hasTags:
+          Array.isArray(endpointDocs.tags) && endpointDocs.tags.length > 0,
+        isHidden: !!endpointDocs.hide,
       });
     } else {
-      this.log("debug", "No endpoint docs found, will use defaults", {
+      this.log('debug', 'No endpoint docs found, will use defaults', {
         defaultPath: _path,
-        defaultMethod: _method
+        defaultMethod: _method,
       });
     }
-    
+
     // Get request validation middlewares
     const requestValidations = this.getMiddlewaresByKey(
-      "requestValidation",
-      ...handlers,
+      'requestValidation',
+      ...handlers
     );
-    
+
     // Log request validation middleware count
     this.log(
-      "debug",
+      'debug',
       `Found ${requestValidations.length} request validations`,
       {
         validationsCount: requestValidations.length,
-        validationMiddlewareNames: requestValidations.map(rv => rv.name),
-      },
+        validationMiddlewareNames: requestValidations.map((rv) => rv.name),
+      }
     );
-    
+
     let haveJson = false,
       json = {},
       haveParameter = false;
     const parameters = [];
-    
+
     // Process each request validation middleware
     for (const requestValidation of requestValidations) {
       const from = requestValidation.metadata.from;
       const schema = requestValidation.metadata.schema;
-      
-      this.log("debug", `Processing request validation from ${from}`, {
+
+      this.log('debug', `Processing request validation from ${from}`, {
         validationName: requestValidation.name,
         from,
         hasSchema: !!schema,
         schemaType: schema ? typeof schema : 'undefined',
         isArray: Array.isArray(schema),
-        keys: schema && typeof schema === 'object' ? Object.keys(schema) : []
+        keys: schema && typeof schema === 'object' ? Object.keys(schema) : [],
       });
-      
-      if (from === "json" || from === "form") {
+
+      if (from === 'json' || from === 'form') {
         haveJson = true;
         try {
           json = Object.assign(json, schema);
-          this.log("debug", `Added JSON/form schema from ${from}`, {
+          this.log('debug', `Added JSON/form schema from ${from}`, {
             from,
             schemaKeys: Object.keys(schema),
             combinedKeys: Object.keys(json),
             schemaContent: JSON.stringify(schema).substring(0, 200) + '...',
-            validationName: requestValidation.name
+            validationName: requestValidation.name,
           });
         } catch (error) {
-          this.log("error", `Failed to process ${from} schema`, {
+          this.log('error', `Failed to process ${from} schema`, {
             error,
             from,
             schema,
-            validationName: requestValidation.name
+            validationName: requestValidation.name,
           });
         }
-      } else if (["query", "header", "cookie", "path"].includes(from)) {
+      } else if (['query', 'header', 'cookie', 'path'].includes(from)) {
         haveParameter = true;
         try {
           // Log each parameter being added
           if (Array.isArray(schema)) {
-            this.log("debug", `Adding ${schema.length} parameters from ${from}`, {
-              parametersToAdd: schema.map(p => ({
-                name: p.name,
-                in: p.in,
-                required: p.required,
-                schema: p.schema
-              }))
-            });
+            this.log(
+              'debug',
+              `Adding ${schema.length} parameters from ${from}`,
+              {
+                parametersToAdd: schema.map((p) => ({
+                  name: p.name,
+                  in: p.in,
+                  required: p.required,
+                  schema: p.schema,
+                })),
+              }
+            );
             parameters.push(...schema);
           } else {
-            this.log("warn", `Schema for ${from} is not an array as expected`, {
+            this.log('warn', `Schema for ${from} is not an array as expected`, {
               schema,
-              validationName: requestValidation.name
+              validationName: requestValidation.name,
             });
           }
         } catch (error) {
-          this.log("error", `Failed to process ${from} parameters`, {
+          this.log('error', `Failed to process ${from} parameters`, {
             error,
             from,
             schema,
-            validationName: requestValidation.name
+            validationName: requestValidation.name,
           });
         }
       } else {
-        this.log("warn", `Unknown validation source: ${from}`, {
+        this.log('warn', `Unknown validation source: ${from}`, {
           validationName: requestValidation.name,
           from,
-          knownSources: ["json", "form", "query", "header", "cookie", "path"]
+          knownSources: ['json', 'form', 'query', 'header', 'cookie', 'path'],
         });
       }
     }
-    
+
     // If endpoint is marked as hidden, skip OpenAPI documentation
     if (endpointDocs?.hide) {
       this.log(
-        "debug",
-        "Endpoint marked as hidden, skipping OpenAPI documentation",
+        'debug',
+        'Endpoint marked as hidden, skipping OpenAPI documentation',
         { path: _path, method: _method }
       );
       return;
     }
-    
+
     // Convert path format for OpenAPI
     const openapiFriendlyPath = this.convertColonRoutesToBraces(
-      endpointDocs?.path || _path,
+      endpointDocs?.path || _path
     );
-    
+
     // Log path conversion
     if (openapiFriendlyPath !== (endpointDocs?.path || _path)) {
-      this.log("debug", "Converted route path for OpenAPI compatibility", {
+      this.log('debug', 'Converted route path for OpenAPI compatibility', {
         originalPath: endpointDocs?.path || _path,
         convertedPath: openapiFriendlyPath,
-        replacements: (endpointDocs?.path || _path).match(/:([^/]+)/g)
+        replacements: (endpointDocs?.path || _path).match(/:([^/]+)/g),
       });
     }
-    
+
     const method = endpointDocs?.method || _method;
     const summary = endpointDocs?.summary || `${method.toUpperCase()} ${_path}`;
-    
+
     this.log(
-      "info",
+      'info',
       `Creating OpenAPI endpoint for ${method.toUpperCase()} ${openapiFriendlyPath}`,
       {
         method: method.toUpperCase(),
         path: openapiFriendlyPath,
         summary,
-        description: endpointDocs?.description || "",
+        description: endpointDocs?.description || '',
         tags: endpointDocs?.tags || [],
         hasRequestBody: haveJson,
         hasParameters: haveParameter,
-        parameterCount: parameters.length
-      },
+        parameterCount: parameters.length,
+      }
     );
-    
+
     try {
       // Create the endpoint builder
       const endpointPath = createEndpointBuilder()
         .setMethod(endpointDocs?.method || method)
         .setPath(openapiFriendlyPath)
         .setSummary(summary)
-        .setDescription(endpointDocs?.description || "")
+        .setDescription(endpointDocs?.description || '')
         .setTags(endpointDocs?.tags || []);
-      
-      this.log("debug", "Created endpoint builder", {
+
+      this.log('debug', 'Created endpoint builder', {
         builderMethod: endpointPath.method,
         builderPath: endpointPath.path,
       });
-      
+
       // Add request body if we have JSON schema
       if (haveJson) {
         try {
-          this.log("debug", "Setting request body content", {
+          this.log('debug', 'Setting request body content', {
             contentKeys: Object.keys(json),
             jsonPreview: JSON.stringify(json).substring(0, 200) + '...',
-            contentType: "application/json"
+            contentType: 'application/json',
           });
           endpointPath.setRawRequestBodyContent(json);
         } catch (error) {
-          this.log("error", "Failed to set request body content", {
+          this.log('error', 'Failed to set request body content', {
             error,
-            jsonKeys: Object.keys(json)
+            jsonKeys: Object.keys(json),
           });
         }
       }
-      
+
       // Add parameters if we have any
       if (haveParameter) {
-        this.log("debug", `Adding ${parameters.length} parameters to endpoint`, {
-          count: parameters.length,
-          types: [...new Set(parameters.map((p) => p.in))],
-          parametersList: parameters.map(p => ({
-            name: p.name,
-            in: p.in,
-            required: p.required
-          }))
-        });
-        
+        this.log(
+          'debug',
+          `Adding ${parameters.length} parameters to endpoint`,
+          {
+            count: parameters.length,
+            types: [...new Set(parameters.map((p) => p.in))],
+            parametersList: parameters.map((p) => ({
+              name: p.name,
+              in: p.in,
+              required: p.required,
+            })),
+          }
+        );
+
         // Add each parameter individually and log any errors
         parameters.forEach((parameter, index) => {
           try {
-            this.log("debug", `Adding parameter: ${parameter.name || index}`, {
+            this.log('debug', `Adding parameter: ${parameter.name || index}`, {
               parameter,
-              index
+              index,
             });
             endpointPath.addRawParameter(parameter);
           } catch (error) {
-            this.log("error", `Failed to add parameter: ${parameter.name || index}`, {
-              error,
-              parameter,
-              index
-            });
+            this.log(
+              'error',
+              `Failed to add parameter: ${parameter.name || index}`,
+              {
+                error,
+                parameter,
+                index,
+              }
+            );
           }
         });
       }
-      
+
       // Add the endpoint to our collection
       this.__endpoints.push(endpointPath);
       this.log(
-        "info",
+        'info',
         `Added endpoint to OpenAPI: ${method.toUpperCase()} ${openapiFriendlyPath}`,
-        { 
+        {
           total: this.__endpoints.length,
           endpointMethod: endpointPath.method,
           endpointPath: endpointPath.path,
-          index: this.__endpoints.length - 1
-        },
+          index: this.__endpoints.length - 1,
+        }
       );
     } catch (error) {
-      this.log("error", "Failed to create OpenAPI endpoint", {
+      this.log('error', 'Failed to create OpenAPI endpoint', {
         error,
         path: openapiFriendlyPath,
         method,
-        summary
+        summary,
       });
     }
   }
@@ -632,11 +686,11 @@ class YelixHono {
    * @returns The current instance for chaining.
    */
   post(path: string, ...handlers: handlers): this {
-    this.log("debug", `Registering POST route: ${path}`, {
+    this.log('debug', `Registering POST route: ${path}`, {
       path,
       handlersCount: handlers.length,
     });
-    this.loadEndpointDocs(path, "post", ...handlers);
+    this.loadEndpointDocs(path, 'post', ...handlers);
 
     const middlewareHandlers = this.parseMiddlewares(handlers);
     this.hono.post(path, ...middlewareHandlers);
@@ -650,11 +704,11 @@ class YelixHono {
    * @returns The current instance for chaining.
    */
   get(path: string, ...handlers: handlers): this {
-    this.log("debug", `Registering GET route: ${path}`, {
+    this.log('debug', `Registering GET route: ${path}`, {
       path,
       handlersCount: handlers.length,
     });
-    this.loadEndpointDocs(path, "get", ...handlers);
+    this.loadEndpointDocs(path, 'get', ...handlers);
 
     const middlewareHandlers = this.parseMiddlewares(handlers, true);
     this.hono.get(path, ...middlewareHandlers);
@@ -668,11 +722,11 @@ class YelixHono {
    * @returns The current instance for chaining.
    */
   delete(path: string, ...handlers: handlers): this {
-    this.log("debug", `Registering DELETE route: ${path}`, {
+    this.log('debug', `Registering DELETE route: ${path}`, {
       path,
       handlersCount: handlers.length,
     });
-    this.loadEndpointDocs(path, "delete", ...handlers);
+    this.loadEndpointDocs(path, 'delete', ...handlers);
 
     const middlewareHandlers = this.parseMiddlewares(handlers);
     this.hono.delete(path, ...middlewareHandlers);
@@ -686,11 +740,11 @@ class YelixHono {
    * @returns The current instance for chaining.
    */
   put(path: string, ...handlers: handlers): this {
-    this.log("debug", `Registering PUT route: ${path}`, {
+    this.log('debug', `Registering PUT route: ${path}`, {
       path,
       handlersCount: handlers.length,
     });
-    this.loadEndpointDocs(path, "put", ...handlers);
+    this.loadEndpointDocs(path, 'put', ...handlers);
 
     const middlewareHandlers = this.parseMiddlewares(handlers);
     this.hono.put(path, ...middlewareHandlers);
@@ -704,11 +758,11 @@ class YelixHono {
    * @returns The current instance for chaining.
    */
   patch(path: string, ...handlers: handlers): this {
-    this.log("debug", `Registering PATCH route: ${path}`, {
+    this.log('debug', `Registering PATCH route: ${path}`, {
       path,
       handlersCount: handlers.length,
     });
-    this.loadEndpointDocs(path, "patch", ...handlers);
+    this.loadEndpointDocs(path, 'patch', ...handlers);
 
     const middlewareHandlers = this.parseMiddlewares(handlers);
     this.hono.patch(path, ...middlewareHandlers);
@@ -722,11 +776,11 @@ class YelixHono {
    * @returns The current instance for chaining.
    */
   options(path: string, ...handlers: handlers): this {
-    this.log("debug", `Registering OPTIONS route: ${path}`, {
+    this.log('debug', `Registering OPTIONS route: ${path}`, {
       path,
       handlersCount: handlers.length,
     });
-    this.loadEndpointDocs(path, "options", ...handlers);
+    this.loadEndpointDocs(path, 'options', ...handlers);
 
     const middlewareHandlers = this.parseMiddlewares(handlers);
     this.hono.options(path, ...middlewareHandlers);
@@ -740,11 +794,11 @@ class YelixHono {
    * @returns The current instance for chaining.
    */
   all(path: string, ...handlers: handlers): this {
-    this.log("debug", `Registering ALL route: ${path}`, {
+    this.log('debug', `Registering ALL route: ${path}`, {
       path,
       handlersCount: handlers.length,
     });
-    ["post", "get", "put", "delete", "patch", "options"].forEach((method) => {
+    ['post', 'get', 'put', 'delete', 'patch', 'options'].forEach((method) => {
       this.loadEndpointDocs(path, method, ...handlers);
     });
 
@@ -761,7 +815,7 @@ class YelixHono {
    * @returns The current instance for chaining.
    */
   on(method: string, path: string, ...handlers: handlers): this {
-    this.log("debug", `Registering ${method.toUpperCase()} route: ${path}`, {
+    this.log('debug', `Registering ${method.toUpperCase()} route: ${path}`, {
       path,
       method: method.toUpperCase(),
       handlersCount: handlers.length,
@@ -780,11 +834,12 @@ class YelixHono {
    * @returns The current instance for chaining.
    */
   use(pathOrHandler: string | handlers[0], ...handlers: handlers): this {
-    const middlewareHandlers = typeof pathOrHandler === "string"
-      ? this.parseMiddlewares(handlers, false)
-      : this.parseMiddlewares([pathOrHandler, ...handlers], false);
+    const middlewareHandlers =
+      typeof pathOrHandler === 'string'
+        ? this.parseMiddlewares(handlers, false)
+        : this.parseMiddlewares([pathOrHandler, ...handlers], false);
 
-    if (typeof pathOrHandler === "string") {
+    if (typeof pathOrHandler === 'string') {
       this.hono.use(pathOrHandler, ...middlewareHandlers);
     } else {
       this.hono.use(...middlewareHandlers);
@@ -820,11 +875,11 @@ class YelixHono {
 
   private mergePaths(...parts: string[]): string {
     const segments = parts
-      .flatMap((p) => p.split("/")) // split all parts by slash
+      .flatMap((p) => p.split('/')) // split all parts by slash
       .filter((p) => p && p.trim()) // remove empty segments
       .map((p) => p.trim());
 
-    return "/" + segments.join("/");
+    return '/' + segments.join('/');
   }
 
   /**
@@ -833,7 +888,7 @@ class YelixHono {
    * @returns The current instance for chaining.
    */
   onError(
-    handler: (err: Error, c: Context) => Response | Promise<Response>,
+    handler: (err: Error, c: Context) => Response | Promise<Response>
   ): this {
     this.hono.onError(handler);
     return this;
@@ -861,13 +916,13 @@ class YelixHono {
     input: RequestInfo | URL,
     requestInit?: RequestInit,
     Env?: any,
-    executionCtx?: ExecutionContext,
+    executionCtx?: ExecutionContext
   ): Response | Promise<Response> {
     return this.hono.request(
       input,
       requestInit as undefined,
       Env,
-      executionCtx,
+      executionCtx
     );
   }
 
@@ -903,7 +958,7 @@ class YelixHono {
       request: Request,
       ...args: any
     ) => Response | Promise<Response>,
-    options?: MountOptions,
+    options?: MountOptions
   ): this {
     this.hono.mount(path, applicationHandler, options);
     return this;
@@ -912,14 +967,14 @@ class YelixHono {
   /**
    * Retrieves the routes defined in the application.
    */
-  get routes(): Hono["routes"] {
+  get routes(): Hono['routes'] {
     return this.hono.routes;
   }
 
   /**
    * Retrieves the router instance used by the application.
    */
-  get router(): Hono["router"] {
+  get router(): Hono['router'] {
     return this.hono.router;
   }
 

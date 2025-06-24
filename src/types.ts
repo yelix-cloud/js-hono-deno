@@ -45,6 +45,14 @@ export type OpenAPIInformation = {
   version: string;
 };
 
+export type YelixOptionsParams = {
+  debug?: boolean;
+  apiKey?: string;
+  environment?: "production" | "development" | string;
+};
+
 export type YelixOptions = {
   debug?: boolean;
+  apiKey?: string;
+  environment: "production" | "development" | string;
 };
