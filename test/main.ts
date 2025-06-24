@@ -15,7 +15,7 @@ const tasks: Task[] = [];
 let nextId = 1; // To simulate auto-incrementing IDs
 
 const app = new YelixHono(undefined, {
-  apiKey: "yelix_cloud-eyJhbGciOiJIUzI1NiJ9.eyJwcm9qZWN0SWQiOiI2ODRjMDMwMzRjN2E5OWFkZmU4MTQ2NDYiLCJwZXJtaXNzaW9ucyI6WyJjcmVhdGUtcmVxdWVzdCIsInJlYWQtcmVxdWVzdCJdLCJpYXQiOjE3NTAwMTA4Njd9.W6zQSVb9Evd9xWCijjK2CWNXSL15DyCKzlWFUEAJVik"
+  apiKey: Deno.env.get("YELIX_API_KEY") || undefined,
 });
 
 app
