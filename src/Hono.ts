@@ -19,8 +19,7 @@ import {
   type OpenAPICore,
 } from '@murat/openapi';
 import { YelixHonoMiddleware } from './HonoMiddleware.ts';
-import { YelixCloud } from 'jsr:@yelix/sdk';
-import { date } from 'zod';
+import { YelixCloud } from '@yelix/sdk';
 
 const yelixOptionsDefaults: YelixOptions = {
   environment: 'development',
