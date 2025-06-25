@@ -49,10 +49,12 @@ export type YelixOptionsParams = {
   debug?: boolean;
   apiKey?: string;
   environment?: "production" | "development" | string;
+  yelixCloudUrl?: string;
 };
 
 export type YelixOptions = {
   debug?: boolean;
   apiKey?: string;
   environment: "production" | "development" | string;
+  yelixCloudUrl: string;
 };

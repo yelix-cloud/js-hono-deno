@@ -25,6 +25,7 @@ const yelixOptionsDefaults: YelixOptions = {
   environment: 'development',
   debug: false,
   apiKey: undefined,
+  yelixCloudUrl: 'https://yelix-be.deno.dev'
 };
 
 /**
@@ -50,7 +51,7 @@ class YelixHono {
     this.config = { ...yelixOptionsDefaults, ...yelixOptions };
 
     if (this.config.apiKey) {
-      this.yelixCloud = new YelixCloud(this.config.apiKey);
+      this.yelixCloud = new YelixCloud(this.config.apiKey, this.config.yelixCloudUrl);
     } else {
       this.yelixCloud = 'Not-Available';
     }
