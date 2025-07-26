@@ -572,6 +572,7 @@ class YelixHono {
 
     const method = endpointDocs?.method || _method;
     const summary = endpointDocs?.summary || `${method.toUpperCase()} ${_path}`;
+    const responses = endpointDocs?.responses || null;
 
     this.log(
       'info',
@@ -596,6 +597,47 @@ class YelixHono {
         .setSummary(summary)
         .setDescription(endpointDocs?.description || '')
         .setTags(endpointDocs?.tags || []);
+      
+      // Set responses if provided
+      if (responses) {
+        this.log('debug', 'Setting responses for endpoint', {
+          responsesCount: Object.keys(responses).length,
+          responses: Object.keys(responses).map((status) => {
+            const statusCode = status as unknown as keyof typeof responses;
+            return {
+              status,
+              description: responses[statusCode]?.description || '',
+              content: responses[statusCode]?.content || {},
+            };
+          }),
+        });
+        
+        // Transform responses to ensure all descriptions are provided and content is properly typed
+        const transformedResponses = Object.entries(responses).reduce((acc, [status, response]) => {
+          if (response) {
+            const transformedContent = response.content 
+              ? Object.entries(response.content).reduce((contentAcc, [mediaType, mediaValue]) => {
+                  if (mediaValue && mediaValue.schema) {
+                    contentAcc[mediaType] = {
+                      schema: mediaValue.schema as Record<string, unknown>
+                    };
+                  }
+                  return contentAcc;
+                }, {} as Record<string, { schema: Record<string, unknown> }>)
+              : undefined;
+              
+            acc[status] = {
+              description: response.description || `HTTP ${status} response`,
+              content: transformedContent,
+            };
+          }
+          return acc;
+        }, {} as Record<string, { description: string; content?: Record<string, { schema: Record<string, unknown> }> }>);
+        
+        endpointPath.setResponses(transformedResponses);
+      } else {
+        this.log('debug', 'No responses provided for endpoint, using defaults');
+      }
 
       this.log('debug', 'Created endpoint builder', {
         builderMethod: endpointPath.method,
