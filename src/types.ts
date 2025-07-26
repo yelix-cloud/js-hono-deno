@@ -108,10 +108,10 @@ export type EndpointDocs = {
   summary?: string;
   description?: string;
   tags?: string[];
-  responses?: Record<
+  responses?: Partial<Record<
     HttpStatusCode,
     { description?: string; content?: Record<string, OpenAPIMediaType> }
-  >;
+  >>;
 };
 
 export type OpenAPIInformation = {
