@@ -1,6 +1,6 @@
 {
   "name": "@yelix/hono",
-  "version": "0.1.29",
+  "version": "0.1.30",
   "exports": "./mod.ts",
   "license": "MIT",
   "tasks": {
@@ -16,7 +16,8 @@
   },
   "publish": {
     "exclude": [
-      "Hono-mock.txt"
+      "Hono-mock.txt",
+      "examples/"
     ]
   }
 }
