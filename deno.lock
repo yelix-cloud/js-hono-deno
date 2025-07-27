@@ -4,14 +4,11 @@
     "jsr:@murat/openapi@~0.1.17": "0.1.17",
     "jsr:@std/assert@*": "1.0.13",
     "jsr:@std/internal@^1.0.6": "1.0.9",
-    "jsr:@yelix/hono@^4.7.8-patch.1": "4.7.8-patch.1",
     "jsr:@yelix/openapi@0.1.17": "0.1.17",
     "jsr:@yelix/sdk@~0.1.11": "0.1.11",
-    "jsr:@yelix/zod-validator@~0.1.8": "0.1.8",
-    "npm:@hono/zod-validator@0.5": "0.5.0_hono@4.8.9_zod@4.0.10",
+    "jsr:@yelix/zod-validator@~0.1.9": "0.1.9",
     "npm:@hono/zod-validator@~0.7.2": "0.7.2_hono@4.8.9_zod@4.0.10",
     "npm:@types/node@*": "22.15.15",
-    "npm:hono@^4.7.8": "4.8.9",
     "npm:hono@^4.8.9": "4.8.9",
     "npm:zod@^4.0.10": "4.0.10",
     "npm:zod@^4.0.5": "4.0.10"
@@ -29,13 +26,6 @@
     "@std/internal@1.0.9": {
       "integrity": "bdfb97f83e4db7a13e8faab26fb1958d1b80cc64366501af78a0aee151696eb8"
     },
-    "@yelix/hono@4.7.8-patch.1": {
-      "integrity": "9d706e368d0d4d11dd578a65f8cd701f3f6fd38ac9deb21097eb26554f1c36d7",
-      "dependencies": [
-        "npm:@hono/zod-validator@0.5",
-        "npm:hono@^4.7.8"
-      ]
-    },
     "@yelix/openapi@0.1.17": {
       "integrity": "648b99fe1c06a62e8555abea353747305f3459904a9c5c063053804198def177"
     },
@@ -46,25 +36,20 @@
       ]
     },
     "@yelix/sdk@0.1.11": {
-      "integrity": "f893f65db2441f048ebfff74bbd50e60053c2323cd6ac9e65c0e3de95b1f759a"
-    },
-    "@yelix/zod-validator@0.1.8": {
-      "integrity": "a1357314cfb441000722fc3ce5cf2bda8fecd70161780807b302f8c3a9042890",
+      "integrity": "f893f65db2441f048ebfff74bbd50e60053c2323cd6ac9e65c0e3de95b1f759a",
       "dependencies": [
-        "jsr:@yelix/hono",
-        "npm:@hono/zod-validator@~0.7.2",
+        "jsr:@yelix/openapi"
+      ]
+    },
+    "@yelix/zod-validator@0.1.9": {
+      "integrity": "f5ee414641871e2212088a6f20c27454589f11779b7453bc8f3d403bfb98f742",
+      "dependencies": [
+        "npm:@hono/zod-validator",
         "npm:zod@^4.0.5"
       ]
     }
   },
   "npm": {
-    "@hono/zod-validator@0.5.0_hono@4.8.9_zod@4.0.10": {
-      "integrity": "sha512-ds5bW6DCgAnNHP33E3ieSbaZFd5dkV52ZjyaXtGoR06APFrCtzAsKZxTHwOrJNBdXsi0e5wNwo5L4nVEVnJUdg==",
-      "dependencies": [
-        "hono",
-        "zod"
-      ]
-    },
     "@hono/zod-validator@0.7.2_hono@4.8.9_zod@4.0.10": {
       "integrity": "sha512-ub5eL/NeZ4eLZawu78JpW/J+dugDAYhwqUIdp9KYScI6PZECij4Hx4UsrthlEUutqDDhPwRI0MscUfNkvn/mqQ==",
       "dependencies": [
@@ -92,7 +77,7 @@
     "dependencies": [
       "jsr:@murat/openapi@~0.1.17",
       "jsr:@yelix/sdk@~0.1.11",
-      "jsr:@yelix/zod-validator@~0.1.8",
+      "jsr:@yelix/zod-validator@~0.1.9",
       "npm:@hono/zod-validator@~0.7.2",
       "npm:hono@^4.8.9",
       "npm:zod@^4.0.10"
