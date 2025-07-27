@@ -1,11 +1,12 @@
 {
   "version": "5",
   "specifiers": {
-    "jsr:@murat/openapi@~0.1.17": "0.1.17",
     "jsr:@std/assert@*": "1.0.13",
     "jsr:@std/internal@^1.0.6": "1.0.9",
     "jsr:@yelix/openapi@0.1.17": "0.1.17",
+    "jsr:@yelix/openapi@~0.1.17": "0.1.17",
     "jsr:@yelix/sdk@~0.1.11": "0.1.11",
+    "jsr:@yelix/zod-validator@*": "0.1.9",
     "jsr:@yelix/zod-validator@~0.1.9": "0.1.9",
     "npm:@hono/zod-validator@~0.7.2": "0.7.2_hono@4.8.9_zod@4.0.10",
     "npm:@types/node@*": "22.15.15",
@@ -14,9 +15,6 @@
     "npm:zod@^4.0.5": "4.0.10"
   },
   "jsr": {
-    "@murat/openapi@0.1.17": {
-      "integrity": "3098b9cacb6493067d3c03fb257fd959eb0c187964136eee5cc0551876ce7799"
-    },
     "@std/assert@1.0.13": {
       "integrity": "ae0d31e41919b12c656c742b22522c32fb26ed0cba32975cb0de2a273cb68b29",
       "dependencies": [
@@ -32,13 +30,13 @@
     "@yelix/sdk@0.1.1": {
       "integrity": "6f27994ad644daca2e416d288b6a4f846187b7147683a57f807bd5ea083fa4f3",
       "dependencies": [
-        "jsr:@yelix/openapi"
+        "jsr:@yelix/openapi@0.1.17"
       ]
     },
     "@yelix/sdk@0.1.11": {
       "integrity": "f893f65db2441f048ebfff74bbd50e60053c2323cd6ac9e65c0e3de95b1f759a",
       "dependencies": [
-        "jsr:@yelix/openapi"
+        "jsr:@yelix/openapi@0.1.17"
       ]
     },
     "@yelix/zod-validator@0.1.9": {
@@ -75,7 +73,7 @@
   },
   "workspace": {
     "dependencies": [
-      "jsr:@murat/openapi@~0.1.17",
+      "jsr:@yelix/openapi@~0.1.17",
       "jsr:@yelix/sdk@~0.1.11",
       "jsr:@yelix/zod-validator@~0.1.9",
       "npm:@hono/zod-validator@~0.7.2",

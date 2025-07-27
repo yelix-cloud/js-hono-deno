@@ -1,7 +1,7 @@
 import type { Context } from "hono";
 import type { MiddlewareHandler, Next } from "hono/types";
 import type { YelixHonoMiddleware } from "./Hono.ts";
-import { OpenAPIMediaType } from "@murat/openapi";
+import type { OpenAPIMediaType } from "@yelix/openapi";
 
 export type HonoBasedHandlers =
   | ((c: Context, next: Next) => Response | Promise<Response>)
@@ -120,6 +120,12 @@ export type OpenAPIInformation = {
   title: string;
   description: string;
   version: string;
+};
+
+export type OpenAPIExposeOptions = {
+  title: string;
+  openapiJsonPath?: string;
+  docsPath?: string;
 };
 
 export type YelixOptionsParams = {

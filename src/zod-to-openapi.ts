@@ -1,5 +1,5 @@
 import type { ZodSchema } from "zod";
-import type { OpenAPIMediaType } from "@murat/openapi";
+import type { OpenAPIMediaType } from "@yelix/openapi";
 
 // OpenAPI Schema types
 interface OpenAPISchema {

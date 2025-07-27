@@ -8,6 +8,7 @@ import type {
   handlers,
   HonoBasedHandlers,
   MountOptions,
+  OpenAPIExposeOptions,
   RequestBody,
   YelixOptions,
   YelixOptionsParams,
@@ -17,9 +18,10 @@ import {
   type EndpointBuilder,
   OpenAPI,
   type OpenAPICore,
-} from "@murat/openapi";
+} from "@yelix/openapi";
 import { YelixHonoMiddleware } from "./HonoMiddleware.ts";
 import { YelixCloud } from "@yelix/sdk";
+import { openapi } from "./openapi.ts";
 
 const yelixOptionsDefaults: YelixOptions = {
   environment: "development",
@@ -164,6 +166,64 @@ class YelixHono {
 
     clone.addEndpoints(this.__endpoints);
     return clone.getJSON();
+  }
+
+  /**
+   * Exposes OpenAPI documentation using Scalar API Reference viewer
+   * @param params - Configuration options for OpenAPI documentation exposure
+   * @param params.openapiJsonPath - Optional custom path for OpenAPI JSON endpoint (defaults to "/openapi.json")
+   * @param params.docsPath - Optional custom path for documentation page (defaults to "/docs")
+   * @param params.title - Optional custom title for the documentation page
+   * @example
+   * ```typescript
+   * app.exposeScalarOpenAPI({
+   *   openapiJsonPath: '/openapi.json',
+   *   docsPath: '/docs',
+   *   title: 'My API Documentation'
+   * });
+   * ```
+   */
+  exposeScalarOpenAPI(params: OpenAPIExposeOptions) {
+    this.get(
+      params.openapiJsonPath ?? "/openapi.json",
+      openapi({ hide: true }),
+      (c) => {
+        return c.json(this.getOpenAPI());
+      },
+    );
+    this.get(
+      params.docsPath ?? "/docs",
+      openapi({ hide: true }),
+      (c) => {
+        return c.html(`<!doctype html>
+<html>
+  <head>
+    <title>
+      ${params.title || "API Documentation"}
+    </title>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1" />
+  </head>
+  <body>
+    <script
+      id="api-reference"
+      data-url="${params.openapiJsonPath ?? "/openapi.json"}"></script>
+
+    <!-- Optional: You can set a full configuration object like this: -->
+    <script>
+      var configuration = {};
+
+      document.getElementById('api-reference').dataset.configuration =
+        JSON.stringify(configuration)
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
+  </body>
+</html>`);
+      },
+    );
   }
 
   private async parseAndCloneBody(req: Request) {

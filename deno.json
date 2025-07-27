@@ -8,7 +8,7 @@
   },
   "imports": {
     "@hono/zod-validator": "npm:@hono/zod-validator@^0.7.2",
-    "@murat/openapi": "jsr:@murat/openapi@^0.1.17",
+    "@yelix/openapi": "jsr:@yelix/openapi@^0.1.17",
     "@yelix/sdk": "jsr:@yelix/sdk@^0.1.11",
     "@yelix/zod-validator": "jsr:@yelix/zod-validator@^0.1.9",
     "hono": "npm:hono@^4.8.9",
