@@ -1,7 +1,7 @@
-import type { Context } from 'hono';
-import type { MiddlewareHandler, Next } from 'hono/types';
-import type { YelixHonoMiddleware } from './Hono.ts';
-import { OpenAPIMediaType } from '@murat/openapi';
+import type { Context } from "hono";
+import type { MiddlewareHandler, Next } from "hono/types";
+import type { YelixHonoMiddleware } from "./Hono.ts";
+import { OpenAPIMediaType } from "@murat/openapi";
 
 export type HonoBasedHandlers =
   | ((c: Context, next: Next) => Response | Promise<Response>)
@@ -18,9 +18,9 @@ export type MountReplaceRequest = (originalRequest: Request) => Request;
 export type MountOptions =
   | MountOptionHandler
   | {
-      optionHandler?: MountOptionHandler;
-      replaceRequest?: MountReplaceRequest | false;
-    };
+    optionHandler?: MountOptionHandler;
+    replaceRequest?: MountReplaceRequest | false;
+  };
 export type RequestBody =
   | string
   | object
@@ -108,10 +108,12 @@ export type EndpointDocs = {
   summary?: string;
   description?: string;
   tags?: string[];
-  responses?: Partial<Record<
-    HttpStatusCode,
-    { description?: string; content?: Record<string, OpenAPIMediaType> }
-  >>;
+  responses?: Partial<
+    Record<
+      HttpStatusCode,
+      { description?: string; content?: Record<string, OpenAPIMediaType> }
+    >
+  >;
 };
 
 export type OpenAPIInformation = {
@@ -123,13 +125,13 @@ export type OpenAPIInformation = {
 export type YelixOptionsParams = {
   debug?: boolean;
   apiKey?: string;
-  environment?: 'production' | 'development' | string;
+  environment?: "production" | "development" | string;
   yelixCloudUrl?: string;
 };
 
 export type YelixOptions = {
   debug?: boolean;
   apiKey?: string;
-  environment: 'production' | 'development' | string;
+  environment: "production" | "development" | string;
   yelixCloudUrl: string;
 };
