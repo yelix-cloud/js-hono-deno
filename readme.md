@@ -21,11 +21,15 @@ scalable and maintainable web applications.
 ### Basic Example
 
 ```ts
-import { z } from "zod";
-import { YelixHono } from "jsr:@yelix/hono";
+import { z } from "npm:zod";
+import { YelixHono as Hono } from "jsr:@yelix/hono";
 import { zValidatorYelix } from "jsr:@yelix/zod-validator";
 
-const app = new YelixHono();
+const app = new Hono(undefined, {
+  apiKey: Deno.env.get("YELIX_CLOUD_API_KEY"),
+  environment: "production",
+  yelixCloudUrl: Deno.env.get("YELIX_CLOUD_URL") || undefined,
+});
 
 app.post(
   "/tasks",
@@ -35,7 +39,7 @@ app.post(
       title: z.string(),
     }),
   ),
-  async (c) => {
+  (c) => {
     const { title } = c.req.valid("json" as never);
     return c.json({ message: `Task "${title}" created!` }, 201);
   },
