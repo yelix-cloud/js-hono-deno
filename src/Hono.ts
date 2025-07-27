@@ -191,6 +191,9 @@ class YelixHono {
         return c.json(this.getOpenAPI());
       },
     );
+    this.__openapi.setTitle(params.title || "API Documentation").setDescription(
+      params.description || "API Documentation",
+    );
     this.get(
       params.docsPath ?? "/docs",
       openapi({ hide: true }),

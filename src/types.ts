@@ -123,7 +123,8 @@ export type OpenAPIInformation = {
 };
 
 export type OpenAPIExposeOptions = {
-  title: string;
+  title?: string;
+  description?: string;
   openapiJsonPath?: string;
   docsPath?: string;
 };
