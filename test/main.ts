@@ -1,6 +1,6 @@
 // deno-lint-ignore-file require-await
 import { z } from "zod";
-import { YelixHono } from "../src/Hono.ts";
+import { YelixHono as Hono } from "../src/Hono.ts";
 import { zValidatorYelix } from "@yelix/zod-validator";
 import { openapi } from "../src/openapi.ts";
 
@@ -14,8 +14,10 @@ type Task = {
 const tasks: Task[] = [];
 let nextId = 1; // To simulate auto-incrementing IDs
 
-const app = new YelixHono(undefined, {
-  apiKey: Deno.env.get("YELIX_API_KEY") || undefined,
+const app = new Hono(undefined, {
+  apiKey: Deno.env.get("YELIX_CLOUD_API_KEY"),
+  environment: "production",
+  yelixCloudUrl: Deno.env.get("YELIX_CLOUD_URL") || undefined,
 });
 
 app
