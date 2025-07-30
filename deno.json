@@ -1,18 +1,18 @@
 {
   "name": "@yelix/hono",
-  "version": "0.1.31",
+  "version": "0.1.32",
   "exports": "./mod.ts",
   "license": "MIT",
   "tasks": {
-    "dev": "deno run --allow-all --watch ./test/main.ts"
+    "dev": "deno run --allow-all --env --watch ./test/main.ts"
   },
   "imports": {
     "@hono/zod-validator": "npm:@hono/zod-validator@^0.7.2",
     "@yelix/openapi": "jsr:@yelix/openapi@^0.1.17",
-    "@yelix/sdk": "jsr:@yelix/sdk@^0.1.11",
+    "@yelix/sdk": "jsr:@yelix/sdk@^0.1.15",
     "@yelix/zod-validator": "jsr:@yelix/zod-validator@^0.1.9",
-    "hono": "npm:hono@^4.8.9",
-    "zod": "npm:zod@^4.0.10"
+    "hono": "npm:hono@^4.8.10",
+    "zod": "npm:zod@^4.0.14"
   },
   "publish": {
     "exclude": [
