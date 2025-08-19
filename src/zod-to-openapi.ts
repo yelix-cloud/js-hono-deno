@@ -576,18 +576,49 @@ function zodSchemaToOpenAPISchema(schema: ZodSchema): OpenAPISchema {
   if (def.type === "union") {
     const options = ((def as unknown as { options: ZodSchema[] }).options || [])
       .map((option: ZodSchema) => zodSchemaToOpenAPISchema(option));
-    return { anyOf: options };
+    
+    // Generate descriptive example showing union types
+    const typeDescriptions = options.map(option => {
+      if (option.type === "array" && option.items) {
+        return `${option.items.type || "unknown"}[]`;
+      } else if (option.type) {
+        return option.type;
+      } else if (option.enum) {
+        return `enum(${option.enum.join(", ")})`;
+      } else if (option.const !== undefined) {
+        return `const(${option.const})`;
+      } else {
+        return "unknown";
+      }
+    });
+    
+    const exampleValue = `union (${typeDescriptions.join(", ")})`;
+    
+    return { anyOf: options, example: exampleValue };
   }
 
   // Handle ZodIntersection
   if (def.type === "intersection") {
+    const leftSchema = zodSchemaToOpenAPISchema((def as unknown as { left: ZodSchema }).left);
+    const rightSchema = zodSchemaToOpenAPISchema((def as unknown as { right: ZodSchema }).right);
+    
+    // For intersections, merge examples if both are objects, otherwise use the first available example
+    let example: unknown = "intersection value";
+    if (leftSchema.example && rightSchema.example) {
+      if (typeof leftSchema.example === 'object' && typeof rightSchema.example === 'object' &&
+          leftSchema.example !== null && rightSchema.example !== null &&
+          !Array.isArray(leftSchema.example) && !Array.isArray(rightSchema.example)) {
+        example = { ...leftSchema.example, ...rightSchema.example };
+      } else {
+        example = leftSchema.example;
+      }
+    } else {
+      example = leftSchema.example || rightSchema.example || example;
+    }
+    
     return {
-      allOf: [
-        zodSchemaToOpenAPISchema((def as unknown as { left: ZodSchema }).left),
-        zodSchemaToOpenAPISchema(
-          (def as unknown as { right: ZodSchema }).right,
-        ),
-      ],
+      allOf: [leftSchema, rightSchema],
+      example
     };
   }
 
@@ -654,7 +685,7 @@ function zodSchemaToOpenAPISchema(schema: ZodSchema): OpenAPISchema {
 
   // Handle ZodVoid
   if (def.type === "void") {
-    return { type: "null" };
+    return { type: "null", example: null };
   }
 
   // Handle ZodNull
