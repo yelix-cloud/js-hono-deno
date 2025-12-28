@@ -14,13 +14,8 @@ type Task = {
 const tasks: Task[] = [];
 let nextId = 1; // To simulate auto-incrementing IDs
 
-const apiKey = Deno.env.get("YELIX_CLOUD_API_KEY");
-const yelixCloudUrl = Deno.env.get("YELIX_CLOUD_URL") || "http://localhost:8000";
-
 const app = new YelixHono(undefined, {
-  apiKey: apiKey,
   environment: "development",
-  yelixCloudUrl: yelixCloudUrl,
   debug: true
 });
 

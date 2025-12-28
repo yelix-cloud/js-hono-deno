@@ -20,14 +20,11 @@ import {
   type OpenAPICore,
 } from '@yelix/openapi';
 import { YelixHonoMiddleware } from './HonoMiddleware.ts';
-import { YelixCloud } from '@yelix/sdk';
 import { openapi } from './openapi.ts';
 
 const yelixOptionsDefaults: YelixOptions = {
   environment: 'development',
   debug: false,
-  apiKey: undefined,
-  yelixCloudUrl: 'https://yelix-be.deno.dev',
 };
 
 /**
@@ -40,8 +37,6 @@ class YelixHono {
   __endpoints: EndpointBuilder[] = [];
   private debug: boolean;
   private config: YelixOptions = yelixOptionsDefaults;
-  private yelixCloud: YelixCloud | 'Not-Initialized' | 'Not-Available' =
-    'Not-Initialized';
 
   /**
    * @param options - Optional configuration for the Hono instance.
@@ -51,16 +46,6 @@ class YelixHono {
     yelixOptions?: YelixOptionsParams
   ) {
     this.config = { ...yelixOptionsDefaults, ...yelixOptions };
-
-    if (this.config.apiKey) {
-      this.yelixCloud = new YelixCloud({
-        apiKey: this.config.apiKey,
-        baseUrl: this.config.yelixCloudUrl,
-        debug: this.config.debug,
-      });
-    } else {
-      this.yelixCloud = 'Not-Available';
-    }
     this.debug = this.config.debug || false;
     this.hono = new Hono(options);
     this.__openapi = new OpenAPI({ debug: this.config.debug })
@@ -119,20 +104,6 @@ class YelixHono {
         console.log(
           `RE | ${url.pathname}, method: ${c.req.method}, duration: ${difference}`
         );
-        if (
-          this.yelixCloud !== 'Not-Initialized' &&
-          this.yelixCloud !== 'Not-Available'
-        ) {
-          const initializeYelixCloud = this.yelixCloud.logRequest({
-            startTime: Date.now(),
-            path: url.pathname,
-            duration: this.calculateDifferenceInMSFormat(start, end),
-            method: c.req.method,
-          });
-          if (typeof initializeYelixCloud === 'function') {
-            initializeYelixCloud(this.config.environment, this.getOpenAPI());
-          }
-        }
       } else {
         this.log(
           'debug',
@@ -308,15 +279,6 @@ class YelixHono {
     }
   }
 
-  private calculateDifferenceInMSFormat(
-    st: [number, number],
-    et: [number, number]
-  ): number {
-    // x ms and y ns difference to x.yms like 23.3ms means 23 milliseconds and 300 nanoseconds difference and if y is 0 then it will be 23ms
-    const diffInNanoSeconds = (et[0] - st[0]) * 1e9 + (et[1] - st[1]); // Difference in nanoseconds
-    const milliseconds = diffInNanoSeconds / 1e6; // Convert to milliseconds
-    return milliseconds;
-  }
 
   /**
    * Wraps a middleware handler with additional functionality like logging and execution time measurement.

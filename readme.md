@@ -26,9 +26,7 @@ import { YelixHono as Hono } from "jsr:@yelix/hono";
 import { zValidatorYelix } from "jsr:@yelix/zod-validator";
 
 const app = new Hono(undefined, {
-  apiKey: Deno.env.get("YELIX_CLOUD_API_KEY"),
   environment: "production",
-  yelixCloudUrl: Deno.env.get("YELIX_CLOUD_URL") || undefined,
 });
 
 app.post(
