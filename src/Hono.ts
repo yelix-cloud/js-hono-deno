@@ -205,29 +205,72 @@ class YelixHono {
       'none';
     let parsed: RequestBody | undefined;
 
+    // Try to parse based on content-type, but handle errors gracefully
+    // Empty bodies or parsing failures should not throw errors
     if (contentType.includes('application/json')) {
-      const json = await clone.json();
-      type = 'json';
-      parsed = json;
+      try {
+        const json = await clone.json();
+        // JSON parsing succeeded - null is valid JSON, so accept it
+        type = 'json';
+        parsed = json;
+      } catch (error) {
+        // Failed to parse JSON - might be malformed, empty, or invalid
+        // This is not an error condition, just treat as no body
+        this.log('debug', 'Failed to parse JSON body (may be empty)', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
     } else if (
       contentType.includes('multipart/form-data') ||
       contentType.includes('application/x-www-form-urlencoded')
     ) {
-      const formData = await clone.formData();
-      type = 'formData';
-      parsed = formData;
+      try {
+        const formData = await clone.formData();
+        // FormData is valid even if empty, so use it if parsing succeeded
+        type = 'formData';
+        parsed = formData;
+      } catch (error) {
+        // Failed to parse form data
+        this.log('debug', 'Failed to parse form data body (may be empty)', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
     } else if (contentType.includes('text/plain')) {
-      const text = await clone.text();
-      type = 'text';
-      parsed = text;
+      try {
+        const text = await clone.text();
+        // Empty string is still valid text content
+        type = 'text';
+        parsed = text;
+      } catch (error) {
+        // Failed to parse text
+        this.log('debug', 'Failed to parse text body (may be empty)', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
     } else if (contentType.includes('application/octet-stream')) {
-      const buffer = await clone.arrayBuffer();
-      type = 'arrayBuffer';
-      parsed = buffer;
+      try {
+        const buffer = await clone.arrayBuffer();
+        // ArrayBuffer is valid even if empty (byteLength === 0)
+        type = 'arrayBuffer';
+        parsed = buffer;
+      } catch (error) {
+        // Failed to parse array buffer
+        this.log('debug', 'Failed to parse array buffer body (may be empty)', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
     } else if (contentType.includes('application/blob')) {
-      const blob = await clone.blob();
-      type = 'blob';
-      parsed = blob;
+      try {
+        const blob = await clone.blob();
+        // Blob is valid even if empty (size === 0)
+        type = 'blob';
+        parsed = blob;
+      } catch (error) {
+        // Failed to parse blob
+        this.log('debug', 'Failed to parse blob body (may be empty)', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
     }
 
     function injectTo(honoReq: any) {
