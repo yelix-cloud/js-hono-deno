@@ -69,8 +69,46 @@ interface ZodSchemaWithDef {
 }
 
 /**
- * Converts a Zod schema to OpenAPI response schema format
- * Supports OpenAPI 3.1 features and comprehensive Zod v4 type mapping
+ * Converts a Zod schema to OpenAPI response schema format.
+ * 
+ * This function transforms a Zod schema into an OpenAPI 3.1 compatible response
+ * schema format. It supports comprehensive Zod v4 type mapping including primitives,
+ * objects, arrays, unions, intersections, and advanced validation features.
+ * 
+ * The returned format is suitable for use in OpenAPI endpoint documentation,
+ * particularly in the `responses` field of `EndpointDocs`.
+ * 
+ * @param schema - The Zod schema to convert to OpenAPI format
+ * @returns An object mapping media type to OpenAPI media type definition
+ * 
+ * @example
+ * ```ts
+ * import { z } from "zod";
+ * import { zodToResponseSchema } from "jsr:@yelix/hono";
+ * 
+ * const responseSchema = z.object({
+ *   id: z.number(),
+ *   name: z.string(),
+ *   email: z.string().email(),
+ * });
+ * 
+ * const openApiSchema = zodToResponseSchema(responseSchema);
+ * // Returns: { "application/json": { schema: {...} } }
+ * 
+ * // Use in endpoint documentation
+ * app.get(
+ *   "/user",
+ *   openapi({
+ *     responses: {
+ *       200: {
+ *         description: "User object",
+ *         content: zodToResponseSchema(responseSchema),
+ *       },
+ *     },
+ *   }),
+ *   handler
+ * );
+ * ```
  */
 export function zodToResponseSchema(
   schema: ZodSchema,

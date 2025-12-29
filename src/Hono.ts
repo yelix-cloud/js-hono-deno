@@ -28,8 +28,29 @@ const yelixOptionsDefaults: YelixOptions = {
 };
 
 /**
- * A wrapper around the Hono framework with additional features like middleware parsing,
- * enhanced logging, and route handling.
+ * A powerful wrapper around the Hono framework with enhanced features for building
+ * production-ready APIs with automatic OpenAPI documentation, request validation,
+ * and comprehensive logging.
+ * 
+ * YelixHono extends Hono with:
+ * - Automatic OpenAPI 3.0 specification generation
+ * - Enhanced middleware management with named middleware and execution tracking
+ * - Automatic request body parsing with graceful error handling
+ * - Performance monitoring and detailed logging
+ * - Built-in Scalar API Reference integration
+ * 
+ * @example
+ * ```ts
+ * import { YelixHono } from "jsr:@yelix/hono";
+ * 
+ * const app = new YelixHono(undefined, {
+ *   debug: true,
+ *   environment: "development"
+ * });
+ * 
+ * app.get("/", (c) => c.json({ message: "Hello World" }));
+ * Deno.serve(app.fetch);
+ * ```
  */
 class YelixHono {
   hono: Hono;
@@ -39,7 +60,25 @@ class YelixHono {
   private config: YelixOptions = yelixOptionsDefaults;
 
   /**
-   * @param options - Optional configuration for the Hono instance.
+   * Creates a new YelixHono instance.
+   * 
+   * @param options - Optional Hono framework configuration options
+   * @param yelixOptions - Optional Yelix-specific configuration options
+   * 
+   * @example
+   * ```ts
+   * // Basic usage
+   * const app = new YelixHono();
+   * 
+   * // With Hono options
+   * const app = new YelixHono({ strict: true });
+   * 
+   * // With Yelix options
+   * const app = new YelixHono(undefined, {
+   *   debug: true,
+   *   environment: "development"
+   * });
+   * ```
    */
   constructor(
     options?: HonoOptions<BlankEnv>,
@@ -130,6 +169,22 @@ class YelixHono {
     }
   }
 
+  /**
+   * Retrieves the OpenAPI 3.0 specification for all documented endpoints.
+   * 
+   * This method collects all endpoint documentation from routes that use the
+   * `openapi()` middleware and returns a complete OpenAPI specification object.
+   * 
+   * @returns The OpenAPI specification as a JSON-serializable object
+   * 
+   * @example
+   * ```ts
+   * // Expose OpenAPI JSON endpoint
+   * app.get("/openapi.json", (c) => {
+   *   return c.json(app.getOpenAPI());
+   * });
+   * ```
+   */
   getOpenAPI(): OpenAPICore {
     const clone = Object.assign(
       Object.create(Object.getPrototypeOf(this.__openapi)),

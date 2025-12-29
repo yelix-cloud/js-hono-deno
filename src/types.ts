@@ -3,24 +3,49 @@ import type { MiddlewareHandler, Next } from "hono/types";
 import type { YelixHonoMiddleware } from "./Hono.ts";
 import type { OpenAPIMediaType } from "@yelix/openapi";
 
+/**
+ * A handler function that can be used as middleware or route handler in YelixHono.
+ * Can be either a standard Hono middleware handler or a custom handler function.
+ */
 export type HonoBasedHandlers =
   | ((c: Context, next: Next) => Response | Promise<Response>)
   | MiddlewareHandler;
 
+/**
+ * An array of handlers that can include standard Hono handlers, middleware handlers,
+ * or YelixHonoMiddleware instances. Used for defining route handlers and middleware chains.
+ */
 export type handlers = Array<
   | ((c: Context, next: Next) => Response | Promise<Response>)
   | MiddlewareHandler
   | YelixHonoMiddleware
 >;
 
+/**
+ * A handler function for mount options that receives a Hono context.
+ */
 export type MountOptionHandler = (c: Context) => unknown;
+
+/**
+ * A function that can replace or modify a request before it's processed by a mounted handler.
+ */
 export type MountReplaceRequest = (originalRequest: Request) => Request;
+
+/**
+ * Options for mounting external application handlers.
+ * Can be either a handler function or an object with optional handler and request replacement.
+ */
 export type MountOptions =
   | MountOptionHandler
   | {
-    optionHandler?: MountOptionHandler;
-    replaceRequest?: MountReplaceRequest | false;
-  };
+      optionHandler?: MountOptionHandler;
+      replaceRequest?: MountReplaceRequest | false;
+    };
+
+/**
+ * Represents the possible types of request bodies that can be parsed and handled.
+ * Includes common web formats like JSON, form data, text, binary data, and streams.
+ */
 export type RequestBody =
   | string
   | object
@@ -31,6 +56,10 @@ export type RequestBody =
   | ReadableStream<Uint8Array>
   | Blob;
 
+/**
+ * HTTP status codes supported by the framework.
+ * Includes all standard status codes from 1xx (Informational) to 5xx (Server Errors).
+ */
 export type HttpStatusCode =
   // 1xx: Informational
   | 100
@@ -101,13 +130,24 @@ export type HttpStatusCode =
   | 510
   | 511;
 
+/**
+ * Configuration object for documenting API endpoints in OpenAPI format.
+ * Used with the `openapi()` middleware to describe endpoint behavior, responses, and metadata.
+ */
 export type EndpointDocs = {
+  /** Whether to hide this endpoint from the OpenAPI documentation */
   hide?: boolean;
+  /** HTTP method override for the endpoint */
   method?: string;
+  /** Path override for the endpoint */
   path?: string;
+  /** Brief summary of what the endpoint does */
   summary?: string;
+  /** Detailed description of the endpoint */
   description?: string;
+  /** Tags for categorizing the endpoint in documentation */
   tags?: string[];
+  /** Response schemas for different HTTP status codes */
   responses?: Partial<
     Record<
       HttpStatusCode,
@@ -116,25 +156,52 @@ export type EndpointDocs = {
   >;
 };
 
+/**
+ * Basic information about the OpenAPI specification.
+ * Contains title, description, and version metadata.
+ */
 export type OpenAPIInformation = {
+  /** The title of the API */
   title: string;
+  /** A description of the API */
   description: string;
+  /** The version of the API */
   version: string;
 };
 
+/**
+ * Options for exposing OpenAPI documentation using Scalar API Reference viewer.
+ * Used with `exposeScalarOpenAPI()` to configure documentation endpoints.
+ */
 export type OpenAPIExposeOptions = {
+  /** Custom title for the documentation page */
   title?: string;
+  /** Description of the API documentation */
   description?: string;
+  /** Custom path for the OpenAPI JSON endpoint (defaults to "/openapi.json") */
   openapiJsonPath?: string;
+  /** Custom path for the documentation page (defaults to "/docs") */
   docsPath?: string;
 };
 
+/**
+ * Configuration parameters for initializing a YelixHono instance.
+ * These options control debugging and environment settings.
+ */
 export type YelixOptionsParams = {
+  /** Enable detailed debug logging for requests and middleware */
   debug?: boolean;
+  /** Environment setting (production, development, or custom string) */
   environment?: "production" | "development" | string;
 };
 
+/**
+ * Resolved configuration options for a YelixHono instance.
+ * Includes default values merged with user-provided parameters.
+ */
 export type YelixOptions = {
+  /** Whether debug logging is enabled */
   debug?: boolean;
+  /** The current environment setting */
   environment: "production" | "development" | string;
 };
