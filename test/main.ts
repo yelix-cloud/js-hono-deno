@@ -1,7 +1,7 @@
 // deno-lint-ignore-file require-await
 import { z } from "zod";
 import { YelixHono } from "../src/Hono.ts";
-import { zValidatorYelix } from "@yelix/zod-validator";
+import { zValidatorYelix } from "jsr:@yelix/zod-validator";
 import { openapi } from "../src/openapi.ts";
 
 type Task = {
