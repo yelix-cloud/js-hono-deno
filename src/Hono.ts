@@ -629,7 +629,7 @@ class YelixHono {
             validationName: requestValidation.name,
           });
         }
-      } else if (['query', 'header', 'cookie', 'path'].includes(from)) {
+      } else if (['query', 'header', 'cookie', 'path', 'param'].includes(from)) {
         haveParameter = true;
         try {
           // Log each parameter being added

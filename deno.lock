@@ -4,12 +4,10 @@
     "jsr:@std/assert@*": "1.0.13",
     "jsr:@std/internal@^1.0.6": "1.0.9",
     "jsr:@yelix/openapi@~0.1.17": "0.1.17",
-    "jsr:@yelix/zod-validator@~0.1.11": "0.1.11",
     "npm:@hono/zod-validator@~0.7.2": "0.7.6_hono@4.9.7_zod@4.2.1",
     "npm:@types/node@*": "22.15.15",
     "npm:hono@^4.9.6": "4.9.7",
-    "npm:zod@^4.0.14": "4.2.1",
-    "npm:zod@^4.0.5": "4.2.1"
+    "npm:zod@^4.0.14": "4.2.1"
   },
   "jsr": {
     "@std/assert@1.0.13": {
@@ -23,13 +21,6 @@
     },
     "@yelix/openapi@0.1.17": {
       "integrity": "648b99fe1c06a62e8555abea353747305f3459904a9c5c063053804198def177"
-    },
-    "@yelix/zod-validator@0.1.11": {
-      "integrity": "e689017263fad2eaacebdddaa5b41d8bedb0c6328ec1149baf506660e634784a",
-      "dependencies": [
-        "npm:@hono/zod-validator",
-        "npm:zod@^4.0.5"
-      ]
     }
   },
   "npm": {
@@ -59,7 +50,7 @@
   "workspace": {
     "dependencies": [
       "jsr:@yelix/openapi@~0.1.17",
-      "jsr:@yelix/zod-validator@~0.1.11",
+      "npm:@hono/zod-validator@~0.7.2",
       "npm:hono@^4.9.6",
       "npm:zod@^4.0.14"
     ]
