@@ -12,6 +12,7 @@ import type {
   RequestBody,
   YelixOptions,
   YelixOptionsParams,
+  YelixEventPayloads,
 } from './types.ts';
 import {
   createEndpointBuilder,
@@ -33,7 +34,7 @@ const yelixOptionsDefaults: YelixOptions = {
  * and comprehensive logging.
  * 
  * YelixHono extends Hono with:
- * - Automatic OpenAPI 3.0 specification generation
+ * - Automatic OpenAPI 3.1 specification generation
  * - Enhanced middleware management with named middleware and execution tracking
  * - Automatic request body parsing with graceful error handling
  * - Performance monitoring and detailed logging
@@ -58,6 +59,7 @@ class YelixHono {
   __endpoints: EndpointBuilder[] = [];
   private debug: boolean;
   private config: YelixOptions = yelixOptionsDefaults;
+  private eventCallbacks: Map<keyof YelixEventPayloads, Array<(payload: any) => Promise<void> | void>> = new Map();
 
   /**
    * Creates a new YelixHono instance.
@@ -96,6 +98,11 @@ class YelixHono {
     this.hono.use('*', async (c, next) => {
       if (!c.get('YELIX_LOGGED' as never)) {
         c.set('YELIX_LOGGED' as never, true);
+        // timestamp + random
+        const timestamp = Date.now();
+        const random = Math.random().toString(36).substring(2, 15);
+        const requestId = `${timestamp}-${random}`;
+        c.set('YELIX_REQUEST_ID' as never, requestId);
         this.log('debug', 'Starting request processing...', {
           url: c.req.url,
           method: c.req.method,
@@ -110,6 +117,22 @@ class YelixHono {
 
         const start = process.hrtime();
         const url = new URL(c.req.url);
+
+        this.emitYelixEvent('request.start', {
+          requestId,
+          url: c.req.url,
+          method: c.req.method,
+          headers: Object.fromEntries([...c.req.raw.headers.entries()]),
+          body: requestBody.parsed,
+          bodyType: requestBody.type,
+          hasContent: !!requestBody.parsed,
+          duration: this.calculateDifference(start, process.hrtime()),
+          status: c.res.status,
+          pathname: url.pathname,
+          search: url.search,
+          params: c.req.param(),
+          query: c.req.query(),
+        } satisfies YelixEventPayloads['request.start']);
 
         console.group('RS |', url.pathname, c.req.method);
         this.log(
@@ -143,6 +166,16 @@ class YelixHono {
         console.log(
           `RE | ${url.pathname}, method: ${c.req.method}, duration: ${difference}`
         );
+
+        this.emitYelixEvent('request.end', {
+          requestId,
+          duration: difference,
+          status: c.res.status,
+          pathname: url.pathname,
+          search: url.search,
+          params: c.req.param(),
+          query: c.req.query(),
+        } satisfies YelixEventPayloads['request.end']);
       } else {
         this.log(
           'debug',
@@ -378,6 +411,18 @@ class YelixHono {
     }
   }
 
+  yelixLog(c: Context, ...args: any[]) {
+    const requestId = c.get('YELIX_REQUEST_ID') as string;
+    const middlewareName = c.get('YELIX_MIDDLEWARE_NAME') as string;
+    const count = c.get('YELIX_MIDDLEWARE_COUNT') as string;
+    
+    this.emitYelixEvent('middleware.log', {
+      requestId,
+      middlewareName,
+      count,
+      messages: args,
+    } satisfies YelixEventPayloads['middleware.log']);
+  }
 
   /**
    * Wraps a middleware handler with additional functionality like logging and execution time measurement.
@@ -395,13 +440,25 @@ class YelixHono {
       if (!name) {
         name = `Anonymous_${count}`;
       }
+      const requestId = c.get('YELIX_REQUEST_ID') as string;
+      c.set('YELIX_MIDDLEWARE_NAME', name);
+      c.set('YELIX_MIDDLEWARE_COUNT', count);
 
       this.log('debug', `Executing middleware: ${name}`, {
         middlewareName: name,
         count: Number(count),
         url: c.req.url,
+        requestId,
       });
       const start = process.hrtime();
+
+      this.emitYelixEvent('middleware.start', {
+        middlewareName: name,
+        count: Number(count),
+        url: c.req.url,
+        requestId,
+      } satisfies YelixEventPayloads['middleware.start']);
+
       console.group('MS |', name);
 
       try {
@@ -415,6 +472,12 @@ class YelixHono {
           status: c.res.status,
         });
         console.log(`ME | ${name}, duration: ${difference}`);
+        this.emitYelixEvent('middleware.end', {
+          requestId,
+          middlewareName: name,
+          count: Number(count),
+          duration: difference,
+        } satisfies YelixEventPayloads['middleware.end']);
         return response || c.res;
       } catch (error) {
         const end = process.hrtime();
@@ -1164,6 +1227,56 @@ class YelixHono {
   fetch = async (req: Request): Promise<Response> => {
     return await this.hono.fetch(req);
   };
+
+  /**
+   * Registers a type-safe event listener for Yelix framework events.
+   * 
+   * @template K - The specific event type to listen for
+   * @param eventName - The name of the event to listen for
+   * @param callback - The event handler callback
+   * @returns The current instance for chaining
+   * 
+   * @example
+   * ```ts
+   * app.onYelixEvent('request.start', (payload) => {
+   *   console.log(`Request started: ${payload.method} ${payload.pathname}`);
+   * });
+   * 
+   * app.onYelixEvent('middleware.end', (payload) => {
+   *   console.log(`Middleware completed: ${payload.middlewareName} (${payload.duration})`);
+   * });
+   * ```
+   */
+  onYelixEvent<K extends keyof YelixEventPayloads>(
+    eventName: K,
+    callback: (payload: YelixEventPayloads[K]) => Promise<void> | void
+  ): this {
+    if (!this.eventCallbacks.has(eventName)) {
+      this.eventCallbacks.set(eventName, []);
+    }
+    this.eventCallbacks.get(eventName)!.push(callback);
+    return this;
+  }
+
+  /**
+   * Emits a type-safe Yelix event to all registered listeners.
+   * 
+   * @template K - The specific event type being emitted
+   * @param eventName - The name of the event
+   * @param payload - The event payload (type-checked based on eventName)
+   */
+  private emitYelixEvent<K extends keyof YelixEventPayloads>(
+    eventName: K,
+    payload: YelixEventPayloads[K]
+  ): void {
+    const callbacks = this.eventCallbacks.get(eventName);
+    if (callbacks) {
+      callbacks.forEach((callback) => {
+        callback(payload);
+      });
+    }
+  }
 }
 
 export { YelixHono, YelixHonoMiddleware };
+// Mantar? Resim? Sürrealizm!

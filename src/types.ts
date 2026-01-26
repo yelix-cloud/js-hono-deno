@@ -205,3 +205,52 @@ export type YelixOptions = {
   /** The current environment setting */
   environment: "production" | "development" | string;
 };
+
+/**
+ * Event payload for request start lifecycle event.
+ * Emitted when a request begins processing.
+ */
+export type YelixEventPayloads = {
+  "request.start": {
+    requestId: string;
+    url: string;
+    method: string;
+    headers: Record<string, string>;
+    body: RequestBody | undefined;
+    bodyType: string;
+    hasContent: boolean;
+    duration: string;
+    status: number;
+    pathname: string;
+    search: string;
+    params: Record<string, string | string[]>;
+    query: Record<string, string | string[]>;
+  };
+  "request.end": {
+    requestId: string;
+    duration: string;
+    status: number;
+    pathname: string;
+    search: string;
+    params: Record<string, string | string[]>;
+    query: Record<string, string | string[]>;
+  };
+  "middleware.log": {
+    requestId: string;
+    middlewareName: string;
+    count: string;
+    messages: any[];
+  };
+  "middleware.start": {
+    middlewareName: string;
+    count: number;
+    url: string;
+    requestId: string;
+  };
+  "middleware.end": {
+    requestId: string;
+    middlewareName: string;
+    count: number;
+    duration: string;
+  };
+};
