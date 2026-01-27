@@ -1,6 +1,6 @@
 {
   "name": "@yelix/hono",
-  "version": "0.1.42",
+  "version": "0.1.43",
   "exports": "./mod.ts",
   "license": "MIT",
   "tasks": {

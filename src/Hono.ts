@@ -167,14 +167,54 @@ class YelixHono {
           `RE | ${url.pathname}, method: ${c.req.method}, duration: ${difference}`
         );
 
+        // Capture response headers
+        const responseHeaders: Record<string, string> = {};
+        c.res.headers.forEach((value, key) => {
+          responseHeaders[key] = value;
+        });
+
+        // Capture response body
+        let responseBody: any = undefined;
+        let responseBodyType = 'unknown';
+        try {
+          const contentType = c.res.headers.get('content-type') || '';
+          const clonedResponse = c.res.clone();
+          const responseText = await clonedResponse.text();
+          
+          if (responseText) {
+            responseBodyType = contentType;
+            
+            // Try to parse as JSON if content-type suggests it
+            if (contentType.includes('application/json')) {
+              try {
+                responseBody = JSON.parse(responseText);
+              } catch {
+                responseBody = responseText;
+              }
+            } else if (contentType.includes('text/') || contentType.includes('application/xml')) {
+              responseBody = responseText;
+            } else {
+              // For other types, store full text
+              responseBody = responseText;
+            }
+          }
+        } catch (error) {
+          this.log('debug', 'Failed to capture response body', { error: String(error) });
+          // Continue without response body capture if it fails
+        }
+
         this.emitYelixEvent('request.end', {
           requestId,
+          method: c.req.method,
           duration: difference,
           status: c.res.status,
           pathname: url.pathname,
           search: url.search,
           params: c.req.param(),
           query: c.req.query(),
+          responseHeaders,
+          responseBody,
+          responseBodyType,
         } satisfies YelixEventPayloads['request.end']);
       } else {
         this.log(

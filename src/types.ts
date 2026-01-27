@@ -228,12 +228,16 @@ export type YelixEventPayloads = {
   };
   "request.end": {
     requestId: string;
+    method: string;
     duration: string;
     status: number;
     pathname: string;
     search: string;
     params: Record<string, string | string[]>;
     query: Record<string, string | string[]>;
+    responseHeaders?: Record<string, string>;
+    responseBody?: unknown;
+    responseBodyType?: string;
   };
   "middleware.log": {
     requestId: string;
