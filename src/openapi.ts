@@ -1,8 +1,13 @@
+import type { Context, Next } from "hono";
 import { namedMiddleware, type YelixHonoMiddleware } from "./HonoMiddleware.ts";
 import type { EndpointDocs } from "./types.ts";
+import { validateDocumentedResponseBody } from "./zod-to-openapi.ts";
 
-// Re-export zodToResponseSchema from the dedicated module
-export { zodToResponseSchema } from "./zod-to-openapi.ts";
+// Re-export helpers from the dedicated module
+export {
+  normalizeEndpointResponses,
+  validateDocumentedResponseBody,
+} from "./zod-to-openapi.ts";
 
 /**
  * Creates an OpenAPI documentation middleware for an endpoint.
@@ -30,8 +35,9 @@ export { zodToResponseSchema } from "./zod-to-openapi.ts";
 export function openapi(endpointDocs: EndpointDocs): YelixHonoMiddleware {
   return namedMiddleware(
     "openapi",
-    async (_c, next) => {
+    async (c: Context, next: Next) => {
       await next();
+      await validateDocumentedResponseBody(c, endpointDocs);
     },
     {
       _yelixKeys: ["openapi"],

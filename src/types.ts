@@ -1,7 +1,7 @@
 import type { Context } from "hono";
 import type { MiddlewareHandler, Next } from "hono/types";
 import type { YelixHonoMiddleware } from "./Hono.ts";
-import type { OpenAPIMediaType } from "@yelix/openapi";
+import { ZodSchema } from "zod";
 
 /**
  * A handler function that can be used as middleware or route handler in YelixHono.
@@ -147,14 +147,36 @@ export type EndpointDocs = {
   description?: string;
   /** Tags for categorizing the endpoint in documentation */
   tags?: string[];
-  /** Response schemas for different HTTP status codes */
-  responses?: Partial<
-    Record<
-      HttpStatusCode,
-      { description?: string; content?: Record<string, OpenAPIMediaType> }
-    >
-  >;
+  /**
+   * Zod schema per HTTP status for response bodies (`application/json` in OpenAPI).
+   * Use `.describe()` on fields for richer docs; per-status descriptions default to
+   * `HTTP {status} response`.
+   */
+  responses?: Partial<Record<HttpStatusCode, ZodSchema>>;
+  /**
+   * When true, this endpoint participates in response-body checks against Zod
+   * `responses` for the actual status (JSON only). Global
+   * {@link YelixOptions.validateResponseSchemas} chooses `'warn'` vs `'error'`;
+   * when that is `'none'`, mismatches still log warnings (per-endpoint opt-in).
+   */
+  validateResponseBody?: boolean;
 };
+
+/** How {@link YelixOptions.validateResponseSchemas} handles a mismatching body. */
+export type ValidateResponseSchemasMode = "none" | "warn" | "error";
+
+/**
+ * Hono context key where `YelixHono` stores the current
+ * {@link YelixOptions.validateResponseSchemas} value (for `openapi()` middleware).
+ */
+export const YELIX_VALIDATE_RESPONSE_SCHEMAS_KEY =
+  "YELIX_VALIDATE_RESPONSE_SCHEMAS" as const;
+
+/**
+ * Hono context key: `YelixHono` installs a typed emitter so `openapi()` validation
+ * can fire {@link YelixEventPayloads} without a direct app reference.
+ */
+export const YELIX_EMIT_EVENT_KEY = "YELIX_EMIT_EVENT" as const;
 
 /**
  * Basic information about the OpenAPI specification.
@@ -193,6 +215,13 @@ export type YelixOptionsParams = {
   debug?: boolean;
   /** Environment setting (production, development, or custom string) */
   environment?: "production" | "development" | string;
+  /**
+   * Global policy for validating outgoing JSON on routes that set
+   * {@link EndpointDocs.validateResponseBody}. `'none'` does not upgrade to
+   * strict errors: those routes still get warn-only checks. `'warn'` logs
+   * mismatches. `'error'` replaces the response with HTTP 500.
+   */
+  validateResponseSchemas?: ValidateResponseSchemasMode;
 };
 
 /**
@@ -204,6 +233,8 @@ export type YelixOptions = {
   debug?: boolean;
   /** The current environment setting */
   environment: "production" | "development" | string;
+  /** See {@link YelixOptionsParams.validateResponseSchemas}. */
+  validateResponseSchemas: ValidateResponseSchemasMode;
 };
 
 /**
@@ -257,4 +288,21 @@ export type YelixEventPayloads = {
     count: number;
     duration: string;
   };
+  /** Emitted when outgoing JSON fails `validateResponseBody` checks (Zod or parse). */
+  "response.schema.mismatch": {
+    requestId: string;
+    method: string;
+    pathname: string;
+    responseStatus: number;
+    mode: "warn" | "error";
+    kind: "invalid_json" | "zod_mismatch";
+    message: string;
+    issues?: unknown;
+  };
 };
+
+/** Context-installed callback used by response-schema validation. */
+export type YelixEmitEventFn = <K extends keyof YelixEventPayloads>(
+  eventName: K,
+  payload: YelixEventPayloads[K],
+) => void;

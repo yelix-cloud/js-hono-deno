@@ -210,9 +210,15 @@ openapi({
   description?: string;
   tags?: string[];
   hide?: boolean; // Hide from OpenAPI docs
-  responses?: Record<number, ResponseSchema>;
+  // responses: Zod schema per HTTP status
+  responses?: Record<number, unknown>;
+  validateResponseBody?: boolean; // Outgoing JSON vs Zod for documented status
 })
 ```
+
+`YelixHono` constructor accepts **`validateResponseSchemas`**: `'none' | 'warn' | 'error'` (global severity for mismatches). Failures emit **`response.schema.mismatch`** via `app.onYelixEvent`.
+
+See the **Usage → OpenAPI** section in the repo’s `web-docs` project for response Zod shorthand, `validateResponseBody`, and `response.schema.mismatch` events.
 
 ## Development
 

@@ -3,16 +3,19 @@ import { type Context, type ExecutionContext, Hono, type Next } from 'hono';
 import process from 'node:process';
 import type { HonoOptions } from 'hono/hono-base';
 import type { BlankEnv } from 'hono/types';
-import type {
-  EndpointDocs,
-  handlers,
-  HonoBasedHandlers,
-  MountOptions,
-  OpenAPIExposeOptions,
-  RequestBody,
-  YelixOptions,
-  YelixOptionsParams,
-  YelixEventPayloads,
+import {
+  type EndpointDocs,
+  type handlers,
+  type HonoBasedHandlers,
+  type MountOptions,
+  type OpenAPIExposeOptions,
+  type RequestBody,
+  type YelixEmitEventFn,
+  type YelixEventPayloads,
+  type YelixOptions,
+  type YelixOptionsParams,
+  YELIX_EMIT_EVENT_KEY,
+  YELIX_VALIDATE_RESPONSE_SCHEMAS_KEY,
 } from './types.ts';
 import {
   createEndpointBuilder,
@@ -22,10 +25,12 @@ import {
 } from '@yelix/openapi';
 import { YelixHonoMiddleware } from './HonoMiddleware.ts';
 import { openapi } from './openapi.ts';
+import { normalizeEndpointResponses } from './zod-to-openapi.ts';
 
 const yelixOptionsDefaults: YelixOptions = {
   environment: 'development',
   debug: false,
+  validateResponseSchemas: 'none',
 };
 
 /**
@@ -96,6 +101,14 @@ class YelixHono {
 
     // Middleware to initialize a counter for middleware execution.
     this.hono.use('*', async (c, next) => {
+      c.set(
+        YELIX_VALIDATE_RESPONSE_SCHEMAS_KEY as never,
+        this.config.validateResponseSchemas,
+      );
+      const yelixEmit: YelixEmitEventFn = (eventName, payload) => {
+        this.emitYelixEvent(eventName, payload);
+      };
+      c.set(YELIX_EMIT_EVENT_KEY as never, yelixEmit);
       if (!c.get('YELIX_LOGGED' as never)) {
         c.set('YELIX_LOGGED' as never, true);
         // timestamp + random
@@ -799,7 +812,9 @@ class YelixHono {
 
     const method = endpointDocs?.method || _method;
     const summary = endpointDocs?.summary || `${method.toUpperCase()} ${_path}`;
-    const responses = endpointDocs?.responses || null;
+    const responses = endpointDocs?.responses
+      ? normalizeEndpointResponses(endpointDocs.responses)
+      : null;
 
     this.log(
       'info',
@@ -1284,6 +1299,10 @@ class YelixHono {
    * 
    * app.onYelixEvent('middleware.end', (payload) => {
    *   console.log(`Middleware completed: ${payload.middlewareName} (${payload.duration})`);
+   * });
+   *
+   * app.onYelixEvent('response.schema.mismatch', (p) => {
+   *   console.log(p.kind, p.message, p.issues);
    * });
    * ```
    */
